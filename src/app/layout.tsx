@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "@/styles/globals.css";
+import { StoreHydrator } from "@/components/store-hydrator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 							<span className="font-semibold">ws-analytics</span>
 						</div>
 					</header>
+					<StoreHydrator />
 					{children}
 					<Toaster />
 				</ThemeProvider>
