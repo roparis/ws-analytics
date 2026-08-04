@@ -1,10 +1,10 @@
 # ws-analytics
 
-Upload a CSV, explore it as charts and tables, and export a PDF report — entirely in your browser.
+A lightweight open-source browser app for exploring Wealthsimple CSV data with charts, tables, and PDF export.
 
-There's no backend and no database: parsing, charting, and rendering all happen client-side, so your data never leaves your machine. This is the open-source core, free to self-host.
+This repository contains the self-hosted core: everything runs in the browser with no backend, no external database, and no data leaving your machine.
 
-## Getting started
+## Quick start
 
 Requires [pnpm](https://pnpm.io).
 
@@ -13,28 +13,100 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then drop in a CSV file.
+Then open [http://localhost:3000](http://localhost:3000) and upload a `.csv` file.
+
+## Features
+
+- Drag-and-drop or select CSV upload
+- Client-side parsing with [Papaparse](https://www.papaparse.com/)
+- Automatic column typing for numbers, dates, and text
+- Sortable, paginated data table
+- Auto-generated chart visualization with column selectors
+- Export the current view as a PDF report
+- Dark/light theme support
 
 ## How it works
 
-- **Upload** — drag and drop or pick a `.csv` file; it's parsed in the browser with [Papaparse](https://www.papaparse.com/).
-- **Explore** — columns are auto-typed (number / date / text), and you get a sortable, paginated table plus an auto-generated chart with column pickers.
-- **Export** — the "Export PDF" button snapshots the current chart and table into a downloadable PDF report.
+1. Upload a CSV file.
+2. The browser parses the file and infers column types.
+3. Data is displayed in an interactive table.
+4. A chart is generated from the selected columns.
+5. Click `Export PDF` to download a report of the current table and chart.
+
+## Exporting Wealthsimple CSV data
+
+To export your transaction data from Wealthsimple:
+
+1. Go to **Activity**.
+2. Click **Download activities**.
+3. Select the desired time period.
+4. Select the accounts you want to export.
+
+Then upload the downloaded CSV into this app.
+
+## Development
+
+Install dependencies and start the local development server:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Build for production:
+
+```bash
+pnpm build
+```
+
+Preview the production build locally:
+
+```bash
+pnpm start
+```
+
+Run static checks:
+
+```bash
+pnpm check
+pnpm typecheck
+```
+
+Auto-fix formatting with Biome:
+
+```bash
+pnpm check:write
+```
 
 ## Tech stack
 
-- [Next.js](https://nextjs.org) (App Router) + React
-- [Tailwind CSS](https://tailwindcss.com) v4
-- [shadcn](https://ui.shadcn.com) components on [Base UI](https://base-ui.com)
-- [Recharts](https://recharts.org) for charts, [TanStack Table](https://tanstack.com/table) for the data table
-- [Biome](https://biomejs.dev) for linting/formatting
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS v4
+- shadcn UI components on Base UI
+- Recharts for charting
+- TanStack Table for data tables
+- Zustand for client state
+- Papaparse for CSV parsing
+- jsPDF + html2canvas for PDF export
+- Biome for linting and formatting
 
-## Scripts
+## Project structure
 
-| Command             | Description                     |
-| -------------------- | -------------------------------- |
-| `pnpm dev`           | Start the dev server             |
-| `pnpm build`         | Production build                 |
-| `pnpm check`         | Lint/format check (Biome)        |
-| `pnpm check:write`   | Lint/format check with autofix   |
-| `pnpm typecheck`     | TypeScript type check            |
+- `src/app/` — Next.js app routes and layouts
+- `src/components/` — UI components and screens
+- `src/lib/` — data parsing, metrics, PDF export, utility helpers
+- `src/stores/` — application state logic
+- `src/styles/` — global styles
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Open a pull request with a clear description.
+
+Feel free to add support for more file formats, deeper charting options, or improved filtering and sorting UX.
+
+## License
+
+This project is open source. See the `LICENSE` file for details.
