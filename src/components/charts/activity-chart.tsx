@@ -23,7 +23,10 @@ const MEASURES = {
 	netCashFlow: { label: "Net cash flow", types: null },
 	deposits: { label: "Deposits & transfers", types: ["MoneyMovement"] },
 	trades: { label: "Trades", types: ["Trade"] },
-	income: { label: "Dividends & income", types: ["Dividend", "BonusPayment"] },
+	income: {
+		label: "Dividends & income",
+		types: ["Dividend", "BonusPayment", "Interest"],
+	},
 	costs: {
 		label: "Fees, interest & tax",
 		types: ["Fee", "InterestCharged", "Tax", "AdministrativePayment"],
@@ -36,9 +39,12 @@ const chartConfig = {
 	value: { label: "Amount", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
-type Bucket = "month" | "quarter" | "year";
+type Bucket = "day" | "month" | "quarter" | "year";
 
-/** Keeps the bar count readable — a 10-year export is 120 months. */
+/**
+ * Keeps the bar count readable at both ends: a 10-year export is 120 months,
+ * while a single-month view would otherwise collapse into one bar.
+ */
 function pickBucket(activities: Activity[]): Bucket {
 	if (activities.length === 0) return "month";
 	let start = activities[0].transactionDate;
@@ -51,12 +57,16 @@ function pickBucket(activities: Activity[]): Bucket {
 		(Number(end.slice(0, 4)) - Number(start.slice(0, 4))) * 12 +
 		(Number(end.slice(5, 7)) - Number(start.slice(5, 7)));
 
+	// Only a one- or two-month window goes daily; a full quarter reads better as
+	// months than as ~90 bars.
+	if (months <= 1) return "day";
 	if (months <= 36) return "month";
 	if (months <= 96) return "quarter";
 	return "year";
 }
 
 function bucketKey(date: string, bucket: Bucket): string {
+	if (bucket === "day") return date;
 	if (bucket === "year") return date.slice(0, 4);
 	if (bucket === "month") return date.slice(0, 7);
 	const quarter = Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1;
@@ -101,11 +111,14 @@ export function ActivityChart({ activities, currency }: ActivityChartProps) {
 		<Card>
 			<CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<CardTitle>
-					{bucket === "month"
-						? "Monthly"
-						: bucket === "quarter"
-							? "Quarterly"
-							: "Yearly"}{" "}
+					{
+						{
+							day: "Daily",
+							month: "Monthly",
+							quarter: "Quarterly",
+							year: "Yearly",
+						}[bucket]
+					}{" "}
 					cash flow
 				</CardTitle>
 				<Select

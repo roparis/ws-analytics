@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import type { SourceFile } from "@/lib/merge";
+import { KNOWN_ACTIVITY_TYPES } from "@/lib/metrics";
 
 const REQUIRED_COLUMNS = [
 	"transaction_date",
@@ -130,6 +131,22 @@ export function parseActivities(
 				if (activities.length === 0) {
 					reject(new Error(`${fileName} contains no activities.`));
 					return;
+				}
+
+				// Surface any activity type the metrics breakdown doesn't account
+				// for, so a new Wealthsimple type is noticed rather than silently
+				// dropped from the income/cost/deposit split.
+				const unknown = [
+					...new Set(
+						activities
+							.map((activity) => activity.activityType)
+							.filter((type) => !KNOWN_ACTIVITY_TYPES.has(type)),
+					),
+				];
+				if (unknown.length > 0) {
+					console.warn(
+						`${fileName}: unrecognized activity types not in the KPI breakdown: ${unknown.join(", ")}. They still count in net cash flow.`,
+					);
 				}
 
 				resolve({ fileName, rawText, activities });
