@@ -22,7 +22,13 @@ export interface Kpis {
 	moneyOut: number;
 	/** Distributions only — cashback and interest are reported separately. */
 	dividends: number;
+	/**
+	 * Credit-card cash back only (`BonusPayment`/`CASHBACK`). Referral bonuses and
+	 * giveaways are `promo`, matching how `flowBreakdown` splits the same rows.
+	 */
 	cashback: number;
+	/** Referral bonuses, giveaways — every `BonusPayment` that isn't `CASHBACK`. */
+	promo: number;
 	/** Interest earned on cash balances (Wealthsimple `Interest`, not the margin `InterestCharged`). */
 	interest: number;
 	/**
@@ -52,6 +58,10 @@ const COST_TYPES = new Set([
 export const KNOWN_ACTIVITY_TYPES = new Set<string>([
 	"MoneyMovement",
 	"Trade",
+	// Share-count corrections (e.g. a ticker change). They carry no cash, so
+	// there is nothing to slot into the split — listed to keep them from
+	// tripping the "unrecognized type" warning on every real export.
+	"LegacyCorporateAction",
 	...INCOME_TYPES,
 	...COST_TYPES,
 ]);
@@ -67,7 +77,7 @@ export const KNOWN_ACTIVITY_TYPES = new Set<string>([
  * reported on their own line so nothing is double-counted or hidden. Any
  * TRANSFER* sub-type is a transfer; everything else is treated as external.
  */
-function isTransfer(subType: string | null): boolean {
+export function isTransfer(subType: string | null): boolean {
 	return (subType ?? "").startsWith("TRANSFER");
 }
 
@@ -85,6 +95,21 @@ const CASH_ACCOUNT_KEYWORDS = ["cash", "chequing", "checking", "save", "spend"];
 export function isCashAccount(accountType: string): boolean {
 	const type = accountType.toLowerCase();
 	return CASH_ACCOUNT_KEYWORDS.some((keyword) => type.includes(keyword));
+}
+
+/**
+ * Does this row count toward `moneyIn`/`moneyOut` — cash that crossed the
+ * boundary into or out of an *investment* account?
+ *
+ * Shared by `computeKpis` and the activity chart's deposits measure so the two
+ * can't drift into showing different numbers for the same period.
+ */
+export function isExternalMoneyMovement(activity: Activity): boolean {
+	return (
+		activity.activityType === "MoneyMovement" &&
+		!isCashAccount(activity.accountType) &&
+		!isTransfer(activity.activitySubType)
+	);
 }
 
 export const EMPTY_FILTERS: ActivityFilters = {
@@ -138,6 +163,7 @@ export function computeKpis(activities: Activity[]): Kpis {
 	let moneyOut = 0;
 	let dividends = 0;
 	let cashback = 0;
+	let promo = 0;
 	let interest = 0;
 	let transfersNet = 0;
 	let start = "";
@@ -151,21 +177,23 @@ export function computeKpis(activities: Activity[]): Kpis {
 			netDeposits += amount;
 			// Salary in / spending out of a cash account is not an investment
 			// contribution or withdrawal, so it never touches these figures.
-			if (isCashAccount(activity.accountType)) {
-				// intentionally excluded
-			} else if (isTransfer(activity.activitySubType)) {
+			if (isExternalMoneyMovement(activity)) {
+				if (amount >= 0) moneyIn += amount;
+				else moneyOut -= amount;
+			} else if (
+				!isCashAccount(activity.accountType) &&
+				isTransfer(activity.activitySubType)
+			) {
 				transfersNet += amount;
-			} else if (amount >= 0) {
-				moneyIn += amount;
-			} else {
-				moneyOut -= amount;
 			}
 		} else if (activity.activityType === "Trade") trades += amount;
 		else if (INCOME_TYPES.has(activity.activityType)) {
 			income += amount;
 			if (activity.activityType === "Dividend") dividends += amount;
 			else if (activity.activityType === "Interest") interest += amount;
-			else cashback += amount;
+			// Only `CASHBACK` is card cash back; `REFER`/`GIVEAWAY` are promos.
+			else if (activity.activitySubType === "CASHBACK") cashback += amount;
+			else promo += amount;
 		} else if (COST_TYPES.has(activity.activityType)) costs += amount;
 
 		const date = activity.transactionDate;
@@ -185,6 +213,7 @@ export function computeKpis(activities: Activity[]): Kpis {
 		moneyOut,
 		dividends,
 		cashback,
+		promo,
 		interest,
 		transfersNet,
 	};
@@ -255,7 +284,8 @@ const CATEGORIES: CategoryDef[] = [
 		section: "internal",
 		key: "eft_in",
 		label: "Deposit from your bank",
-		description: "Cash you moved in from your linked bank account",
+		description:
+			"Cash you moved in from your linked bank account — this is what Net deposits counts",
 		match: (a) =>
 			a.activityType === "MoneyMovement" &&
 			a.activitySubType === "EFT" &&
@@ -265,7 +295,8 @@ const CATEGORIES: CategoryDef[] = [
 		section: "internal",
 		key: "eft_out",
 		label: "Withdrawal to your bank",
-		description: "Cash you moved back out to your linked bank account",
+		description:
+			"Cash you moved back out to your linked bank account — netted off Net deposits",
 		match: (a) =>
 			a.activityType === "MoneyMovement" &&
 			a.activitySubType === "EFT" &&
@@ -284,6 +315,19 @@ const CATEGORIES: CategoryDef[] = [
 		label: "Pre-authorized debit",
 		description: "Bills and pre-authorized payments pulled from the account",
 		match: isMovement("AFT_OUT"),
+	},
+	{
+		// Wealthsimple books credit-card bill payments as a TRANSFER, but this
+		// money leaves the ecosystem to pay a card balance — it is spending, not
+		// cash moving between the owner's own accounts. Must precede `transfer`.
+		section: "out",
+		key: "cc_payment",
+		label: "Credit card payment",
+		description: "Paying down your Wealthsimple credit card",
+		match: (a) =>
+			a.activityType === "MoneyMovement" &&
+			a.activitySubType === "TRANSFER" &&
+			a.description === "Credit card payment",
 	},
 	{
 		section: "internal",
@@ -328,7 +372,9 @@ const CATEGORIES: CategoryDef[] = [
 		match: (a) => a.activityType === "Interest",
 	},
 	{
-		section: "internal",
+		// Card rewards are earnings, not cash shuffled between your own accounts.
+		// Filing them here keeps this section's total equal to `Kpis.income`.
+		section: "income",
 		key: "cashback",
 		label: "Credit-card cash back",
 		description: "Cash back from the Wealthsimple card",
@@ -375,7 +421,7 @@ const CATEGORIES: CategoryDef[] = [
 const SECTION_TITLES: Record<FlowSectionKey, string> = {
 	in: "Money in",
 	out: "Money out",
-	internal: "Between your accounts & bank",
+	internal: "Funding & transfers",
 	investing: "Investing",
 	income: "Income",
 	fees: "Fees & tax",
