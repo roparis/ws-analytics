@@ -26,7 +26,7 @@ export function KpiCards({ kpis, currency, isAccountFiltered }: KpiCardsProps) {
 		{
 			label: "Dividends & income",
 			value: kpis.income,
-			hint: "Dividend distributions plus cash back.",
+			hint: "Dividend distributions, cash back and interest.",
 		},
 		{
 			label: "Fees, interest & tax",
