@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
+import { MonthBreakdownChart } from "@/components/charts/month-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
 import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
@@ -14,58 +15,10 @@ import {
 	computeKpis,
 	EMPTY_FILTERS,
 	filterActivities,
-	formatCurrency,
 	formatDate,
-	groupByMonth,
 	matchDatasetValue,
 } from "@/lib/metrics";
-import type { Activity } from "@/lib/wealthsimple";
 import { useDatasetStore } from "@/stores/dataset";
-
-/**
- * A compact, non-linking month list. `MonthCard`/`TimelineFeed` always link to
- * `/month/[key]`, the all-accounts view — reusing them here would let a click
- * silently drop the account scope, so this is a few lines of plain JSX instead.
- */
-function MonthBreakdown({
-	activities,
-	currency,
-}: {
-	activities: Activity[];
-	currency: string;
-}) {
-	const months = useMemo(() => groupByMonth(activities), [activities]);
-	if (months.length === 0) return null;
-
-	return (
-		<Card size="sm">
-			<CardContent className="flex flex-col gap-1">
-				<h2 className="mb-2 font-heading font-medium text-base">By month</h2>
-				{months.map((month) => (
-					<div
-						className="flex items-center justify-between gap-3 py-1 text-sm"
-						key={month.key}
-					>
-						<span>{month.label}</span>
-						<span className="flex gap-4 text-muted-foreground tabular-nums">
-							<span>
-								Invested{" "}
-								{formatCurrency(month.kpis.netCapitalDeployed, currency)}
-							</span>
-							<span>Income {formatCurrency(month.kpis.income, currency)}</span>
-							<span>
-								Fees & tax {formatCurrency(-month.kpis.costs, currency)}
-							</span>
-							<span className="text-foreground">
-								Net {formatCurrency(month.kpis.netCashFlow, currency)}
-							</span>
-						</span>
-					</div>
-				))}
-			</CardContent>
-		</Card>
-	);
-}
 
 export function AccountDetail({
 	typeParam,
@@ -156,7 +109,7 @@ export function AccountDetail({
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />
 			<MoneyFlow activities={scoped} currency={currency} />
 			<ActivityChart activities={scoped} currency={currency} />
-			<MonthBreakdown activities={scoped} currency={currency} />
+			<MonthBreakdownChart activities={scoped} currency={currency} />
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>
 	);
