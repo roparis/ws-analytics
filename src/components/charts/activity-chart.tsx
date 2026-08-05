@@ -16,20 +16,33 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency } from "@/lib/metrics";
+import { formatCurrency, isExternalMoneyMovement } from "@/lib/metrics";
 import type { Activity } from "@/lib/wealthsimple";
 
+/**
+ * `filter` narrows a measure beyond its activity types. It exists so the
+ * deposits measure can apply exactly the same exclusions as `computeKpis`'s
+ * `moneyIn`/`moneyOut` — the KPI tiles and this chart render from the same
+ * filtered array, so a looser rule here would show two numbers for one period.
+ * Every entry declares the key (`null` when unused) to keep the union indexable.
+ */
 const MEASURES = {
-	netCashFlow: { label: "Net cash flow", types: null },
-	deposits: { label: "Deposits & transfers", types: ["MoneyMovement"] },
-	trades: { label: "Trades", types: ["Trade"] },
+	netCashFlow: { label: "Net cash flow", types: null, filter: null },
+	deposits: {
+		label: "Deposits & withdrawals",
+		types: ["MoneyMovement"],
+		filter: isExternalMoneyMovement,
+	},
+	trades: { label: "Trades", types: ["Trade"], filter: null },
 	income: {
 		label: "Dividends & income",
 		types: ["Dividend", "BonusPayment", "Interest"],
+		filter: null,
 	},
 	costs: {
 		label: "Fees, interest & tax",
 		types: ["Fee", "InterestCharged", "Tax", "AdministrativePayment"],
+		filter: null,
 	},
 } as const;
 
@@ -79,10 +92,13 @@ function buildChartData(
 	bucket: Bucket,
 ) {
 	const types: readonly string[] | null = MEASURES[measure].types;
+	const filter: ((activity: Activity) => boolean) | null =
+		MEASURES[measure].filter;
 	const totals = new Map<string, number>();
 
 	for (const activity of activities) {
 		if (types && !types.includes(activity.activityType)) continue;
+		if (filter && !filter(activity)) continue;
 		const key = bucketKey(activity.transactionDate, bucket);
 		if (!key) continue;
 		totals.set(key, (totals.get(key) ?? 0) + activity.netCashAmount);

@@ -19,23 +19,26 @@ interface HeadlineFiguresProps {
 }
 
 /**
- * `income` is the sum of dividends, interest and cash back. Most accounts only
- * ever earn one of the three (a TFSA holding equities gets dividends, not
- * interest or cash back), so labelling it generically as "Income" is vaguer
- * than the data actually is — name the specific source when there's only one,
- * and fall back to "Income" only when it's a genuine mix (or zero).
+ * `income` is the sum of dividends, interest, cash back and promos (referral
+ * bonuses, giveaways). Most accounts only ever earn one of the four (a TFSA
+ * holding equities gets dividends, not interest or cash back), so labelling it
+ * generically as "Income" is vaguer than the data actually is — name the
+ * specific source when there's only one, and fall back to "Income" only when
+ * it's a genuine mix (or zero).
  */
 function incomeLabel(kpis: Kpis): string {
 	const sources = [
 		kpis.dividends !== 0,
 		kpis.interest !== 0,
 		kpis.cashback !== 0,
+		kpis.promo !== 0,
 	].filter(Boolean).length;
 
 	if (sources !== 1) return "Income";
 	if (kpis.dividends !== 0) return "Dividends";
 	if (kpis.interest !== 0) return "Interest";
-	return "Cash back";
+	if (kpis.cashback !== 0) return "Cash back";
+	return "Bonus";
 }
 
 /**

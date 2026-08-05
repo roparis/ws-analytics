@@ -96,11 +96,16 @@ quantity, and all 76 SELL rows have negative quantity.
 
 ### 2.3 The trade cash identity
 
-For all 1,541 trade rows, to within a cent:
+For all 1,541 trade rows, to within two cents:
 
 ```
 net_cash_amount == -(quantity × unit_price) - commission
 ```
+
+Two cents, not one: Wealthsimple rounds the cash total independently of the quantity and price
+it reports, so a $25 recurring crypto buy books as exactly `-25.00` while
+`quantity × unit_price + commission` works out to `-24.99`. Eleven rows sit at that one-cent
+offset; none exceed it.
 
 Because `quantity` is signed, this single formula covers both sides: a BUY (`quantity > 0`)
 yields negative cash, a SELL (`quantity < 0`) yields positive cash. Commission is always
@@ -296,7 +301,7 @@ parsing bug or a change in Wealthsimple's export.
 
 | # | Invariant | Status |
 |---|---|---|
-| I1 | `net_cash_amount == -(quantity × unit_price) - commission` on every `Trade` | 1541/1541 ✅ |
+| I1 | `net_cash_amount == -(quantity × unit_price) - commission` on every `Trade`, ±2¢ | 1541/1541 ✅ |
 | I2 | `quantity == net_cash_amount` on every non-`Trade`, non-`LegacyCorporateAction` row | 1359/1359 ✅ |
 | I3 | `Σ quantity` per `symbol` over `Trade`+`LegacyCorporateAction` is never negative | 44/44 symbols ✅ |
 | I4 | Fully-exited positions land on exactly `0.000000`, not a dust residual | 19/19 closed ✅ |
@@ -417,25 +422,43 @@ net of refunds = **$548.16** · total income (dividends + interest + bonus) = **
 
 ---
 
-## 10. Findings to act on
+## 10. Findings
 
-Discrepancies between this document and the current implementation, in priority order. None
-are fixed by this document — it only records them.
+Discrepancies between this document and the implementation.
 
-1. **`Credit card payment` is misclassified as internal.** Nine `TRANSFER` rows totalling
-   −$2,579.11 are real external spending but land in the `internal` flow section because the
-   rule keys on sub-type ([metrics.ts:293](../src/lib/metrics.ts:293)). Needs a description
-   check to split them out. (§3.1)
-2. **The `cashback` KPI is mislabelled.** It sums all `BonusPayment` ($83.01), not cashback
-   ($53.01) ([metrics.ts:168](../src/lib/metrics.ts:168)). Either rename the KPI to "Bonuses"
-   or split on sub-type. (§3.1)
-3. **No invariant tests exist.** I1, I2 and I5 (§6) are cheap, exact, and would catch nearly
-   any parsing or merge regression. I5 in particular.
-4. **The export timestamp is discarded.** The footer's "As of" time would let the UI show
+### Fixed
+
+1. ~~**`Credit card payment` is misclassified as internal.**~~ The nine `TRANSFER` rows
+   totalling −$2,579.11 now match on description ahead of the generic transfer rule and land
+   under **Money out** as their own line. (§3.1)
+2. ~~**The `cashback` KPI is mislabelled.**~~ `computeKpis` now splits `cashback` ($53.01,
+   `CASHBACK` only) from `promo` ($30.00, `REFER` + `GIVEAWAY`), matching how `flowBreakdown`
+   already categorised the same rows. A promo-only period now reads "Bonus", not "Cash back".
+   (§3.1)
+3. ~~**No invariant tests exist.**~~ Vitest added. I1, I2 and I5 run against the *real* file at
+   parse time via `validateDataset` in `wealthsimple.ts` — asserting them over hand-built
+   fixtures would only test the fixtures. The reference export produces zero violations.
+
+Fixed alongside these, found while verifying:
+
+4. **The chart disagreed with the KPI tiles.** The "Deposits & transfers" measure summed every
+   `MoneyMovement` row, while `moneyIn`/`moneyOut` exclude cash-account rows and internal
+   transfers. Both now route through `isExternalMoneyMovement`; the measure is relabelled
+   "Deposits & withdrawals" to match what it counts ($46,058.84).
+5. **Cash back sat outside the Income section.** `flowBreakdown` filed `CASHBACK` under the
+   internal section while `computeKpis` counted it as income, so the two totals differed by
+   $53.01. Cash back is now in Income, and the section total equals `Kpis.income` exactly
+   ($4,287.25).
+6. **`LegacyCorporateAction` tripped the unknown-type warning** on every real export despite
+   being documented and carrying no cash. Added to `KNOWN_ACTIVITY_TYPES`.
+
+### Open
+
+7. **The export timestamp is discarded.** The footer's "As of" time would let the UI show
    source freshness. (§1.1)
-5. **`name` is used unnormalised.** Non-breaking spaces and trailing whitespace will bite any
-   grouping or matching on that field. (§2.5)
-6. **Portfolio value is not derivable from this file.** If the UI implies a portfolio value or
+8. **`name` is used unnormalised.** Non-breaking spaces and trailing whitespace will bite any
+   grouping or matching on that field. Currently latent — nothing groups by `name` today. (§2.5)
+9. **Portfolio value is not derivable from this file.** If the UI implies a portfolio value or
    return anywhere, it is either wrong or is silently sourcing prices elsewhere. (§8)
 
 ---
