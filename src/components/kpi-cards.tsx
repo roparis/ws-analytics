@@ -16,7 +16,7 @@ export function KpiCards({ kpis, currency, isAccountFiltered }: KpiCardsProps) {
 			value: kpis.netDeposits,
 			hint: isAccountFiltered
 				? "Cash moved into the selected accounts, including transfers from your other Wealthsimple accounts."
-				: "Cash moved in from outside Wealthsimple. Transfers between your own accounts cancel out.",
+				: "Every cash movement, net. Bank deposits fund the accounts; transfers between your own accounts cancel out.",
 		},
 		{
 			label: "Net capital deployed",
@@ -26,7 +26,7 @@ export function KpiCards({ kpis, currency, isAccountFiltered }: KpiCardsProps) {
 		{
 			label: "Dividends & income",
 			value: kpis.income,
-			hint: "Dividend distributions, cash back and interest.",
+			hint: "Dividend distributions, interest, cash back and bonuses.",
 		},
 		{
 			label: "Fees, interest & tax",
