@@ -115,6 +115,17 @@ export function ActivitiesTable({
 				),
 			},
 			{
+				accessorKey: "quantity",
+				header: "Quantity",
+				cell: ({ row }) => (
+					<span
+						className={cn("block whitespace-nowrap text-right tabular-nums")}
+					>
+						{row.original.quantity}
+					</span>
+				),
+			},
+			{
 				accessorKey: "netCashAmount",
 				header: "Amount",
 				cell: ({ row }) => (

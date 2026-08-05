@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { AccountTypeCards } from "@/components/accounts/account-type-cards";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { CsvUploader } from "@/components/csv-uploader";
@@ -11,6 +12,7 @@ import {
 	resolveDateFrom,
 } from "@/components/dashboard-filters";
 import { KpiCards } from "@/components/kpi-cards";
+import { MoneyFlow } from "@/components/money-flow";
 import { PdfExportButton } from "@/components/pdf-export-button";
 import { SourcesPanel } from "@/components/sources-panel";
 import { Button } from "@/components/ui/button";
@@ -76,6 +78,7 @@ export function Dashboard() {
 
 			<div className="flex flex-col gap-6 bg-background" ref={reportRef}>
 				<SourcesPanel sources={dataset.sources} />
+				<AccountTypeCards currency={currency} dataset={dataset} />
 				<DashboardFilters
 					dataset={dataset}
 					datePreset={datePreset}
@@ -88,6 +91,7 @@ export function Dashboard() {
 					isAccountFiltered={isAccountFiltered}
 					kpis={kpis}
 				/>
+				<MoneyFlow activities={filtered} currency={currency} />
 				<ActivityChart activities={filtered} currency={currency} />
 				<ActivitiesTable activities={filtered} currency={currency} />
 			</div>

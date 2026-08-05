@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "@/styles/globals.css";
+import { AppShell } from "@/components/app-shell";
 import { StoreHydrator } from "@/components/store-hydrator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -39,13 +40,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 					disableTransitionOnChange
 					enableSystem
 				>
-					<header className="border-b">
-						<div className="mx-auto flex w-full max-w-6xl items-center px-6 py-4">
-							<span className="font-semibold">ws-analytics</span>
-						</div>
-					</header>
 					<StoreHydrator />
-					{children}
+					<AppShell>{children}</AppShell>
 					<Toaster />
 				</ThemeProvider>
 			</body>

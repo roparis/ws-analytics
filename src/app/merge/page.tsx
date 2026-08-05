@@ -76,7 +76,7 @@ export default function MergePage() {
 	);
 
 	return (
-		<div className="flex flex-1 flex-col gap-6">
+		<main className="flex flex-1 flex-col gap-6 py-6">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h1 className="font-semibold text-lg">Merge sources</h1>
@@ -90,7 +90,7 @@ export default function MergePage() {
 					render={
 						<Link href="/">
 							<ArrowLeft className="size-4" />
-							Back to dashboard
+							Back to timeline
 						</Link>
 					}
 					variant="ghost"
@@ -326,6 +326,6 @@ export default function MergePage() {
 					</CardContent>
 				</Card>
 			)}
-		</div>
+		</main>
 	);
 }
