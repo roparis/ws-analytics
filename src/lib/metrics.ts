@@ -98,6 +98,58 @@ export function isCashAccount(accountType: string): boolean {
 }
 
 /**
+ * Wealthsimple appends `(executed at <date>)` to some descriptions and not
+ * others — the same bank deposit reads `Deposit` on one row and
+ * `Deposit (executed at 2026-06-04)` on the next. Strip the suffix so a
+ * description can be compared against a fixed template.
+ */
+const EXECUTED_AT = /\s*\(executed at [^)]*\)\s*$/;
+
+/**
+ * Does this row's description match `template` exactly, ignoring the optional
+ * `(executed at …)` suffix?
+ *
+ * Matching the whole template rather than a substring matters: the chequing
+ * `AFT_IN` rows read "Direct deposit received", which a `includes("Deposit")`
+ * test would wrongly pull in alongside the real bank deposits.
+ */
+export function describedAs(activity: Activity, template: string): boolean {
+	return activity.description.replace(EXECUTED_AT, "").trim() === template;
+}
+
+/**
+ * Cash that crossed the boundary from your linked bank *into* an investment
+ * account, identified by the description Wealthsimple writes on the row.
+ *
+ * Keyed on the description rather than on the sign of `net_cash_amount`: the
+ * sign says which way the money went, not what kind of movement it was, so a
+ * sign test silently swept in any other non-transfer `MoneyMovement` type that
+ * happened to be positive. Every row Wealthsimple means as a bank deposit says
+ * so in words.
+ */
+export function isBankDeposit(activity: Activity): boolean {
+	return (
+		activity.activityType === "MoneyMovement" &&
+		!isCashAccount(activity.accountType) &&
+		// Real transfers word themselves differently, so this guard is redundant
+		// on today's exports — but a `TRANSFER*` row that ever said "Deposit"
+		// would otherwise be counted as new money *and* on the transfers line.
+		!isTransfer(activity.activitySubType) &&
+		describedAs(activity, "Deposit")
+	);
+}
+
+/** The withdrawal counterpart of `isBankDeposit`. */
+export function isBankWithdrawal(activity: Activity): boolean {
+	return (
+		activity.activityType === "MoneyMovement" &&
+		!isCashAccount(activity.accountType) &&
+		!isTransfer(activity.activitySubType) &&
+		describedAs(activity, "Withdrawal")
+	);
+}
+
+/**
  * Does this row count toward `moneyIn`/`moneyOut` — cash that crossed the
  * boundary into or out of an *investment* account?
  *
@@ -105,11 +157,7 @@ export function isCashAccount(accountType: string): boolean {
  * can't drift into showing different numbers for the same period.
  */
 export function isExternalMoneyMovement(activity: Activity): boolean {
-	return (
-		activity.activityType === "MoneyMovement" &&
-		!isCashAccount(activity.accountType) &&
-		!isTransfer(activity.activitySubType)
-	);
+	return isBankDeposit(activity) || isBankWithdrawal(activity);
 }
 
 export const EMPTY_FILTERS: ActivityFilters = {
@@ -177,9 +225,13 @@ export function computeKpis(activities: Activity[]): Kpis {
 			netDeposits += amount;
 			// Salary in / spending out of a cash account is not an investment
 			// contribution or withdrawal, so it never touches these figures.
-			if (isExternalMoneyMovement(activity)) {
-				if (amount >= 0) moneyIn += amount;
-				else moneyOut -= amount;
+			// Each side is added signed rather than by magnitude, so a reversal
+			// booked against the original description nets it off instead of
+			// inflating both totals.
+			if (isBankDeposit(activity)) {
+				moneyIn += amount;
+			} else if (isBankWithdrawal(activity)) {
+				moneyOut -= amount;
 			} else if (
 				!isCashAccount(activity.accountType) &&
 				isTransfer(activity.activitySubType)
@@ -268,7 +320,8 @@ const isMovement = (subType: string) => (activity: Activity) =>
 	activity.activityType === "MoneyMovement" &&
 	activity.activitySubType === subType;
 
-// First match wins, so more specific rules (sign-sensitive EFT) come first.
+// First match wins, so more specific rules (the description-keyed EFT and
+// credit-card lines) come before the sub-type catch-alls they overlap with.
 const CATEGORIES: CategoryDef[] = [
 	{
 		section: "in",
@@ -287,9 +340,7 @@ const CATEGORIES: CategoryDef[] = [
 		description:
 			"Cash you moved in from your linked bank account — this is what Net deposits counts",
 		match: (a) =>
-			a.activityType === "MoneyMovement" &&
-			a.activitySubType === "EFT" &&
-			a.netCashAmount >= 0,
+			a.activityType === "MoneyMovement" && describedAs(a, "Deposit"),
 	},
 	{
 		section: "internal",
@@ -298,9 +349,7 @@ const CATEGORIES: CategoryDef[] = [
 		description:
 			"Cash you moved back out to your linked bank account — netted off Net deposits",
 		match: (a) =>
-			a.activityType === "MoneyMovement" &&
-			a.activitySubType === "EFT" &&
-			a.netCashAmount < 0,
+			a.activityType === "MoneyMovement" && describedAs(a, "Withdrawal"),
 	},
 	{
 		section: "out",
@@ -327,7 +376,7 @@ const CATEGORIES: CategoryDef[] = [
 		match: (a) =>
 			a.activityType === "MoneyMovement" &&
 			a.activitySubType === "TRANSFER" &&
-			a.description === "Credit card payment",
+			describedAs(a, "Credit card payment"),
 	},
 	{
 		section: "internal",
@@ -549,6 +598,41 @@ export function groupByMonth(activities: Activity[]): MonthGroup[] {
 			activities: rows,
 			kpis: computeKpis(rows),
 			accountTypes: [...new Set(rows.map((row) => row.accountType))].sort(),
+		}));
+}
+
+export interface YearGroup {
+	/** `2026` — sortable and used as the section anchor. */
+	key: string;
+	activities: Activity[];
+	kpis: Kpis;
+	/** The year's months, newest first — the same objects `groupByMonth` returns. */
+	months: MonthGroup[];
+}
+
+/**
+ * Newest year first, mirroring `groupByMonth`. Delegates to `computeKpis` and
+ * `groupByMonth` for each year's bucket rather than re-deriving their figures,
+ * so a year's totals and its month cards can never drift apart.
+ */
+export function groupByYear(activities: Activity[]): YearGroup[] {
+	const buckets = new Map<string, Activity[]>();
+
+	for (const activity of activities) {
+		const key = activity.transactionDate.slice(0, 4);
+		if (!key) continue;
+		const bucket = buckets.get(key);
+		if (bucket) bucket.push(activity);
+		else buckets.set(key, [activity]);
+	}
+
+	return [...buckets.entries()]
+		.sort((a, b) => b[0].localeCompare(a[0]))
+		.map(([key, rows]) => ({
+			key,
+			activities: rows,
+			kpis: computeKpis(rows),
+			months: groupByMonth(rows),
 		}));
 }
 

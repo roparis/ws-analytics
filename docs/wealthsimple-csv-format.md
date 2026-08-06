@@ -197,8 +197,28 @@ is therefore $548.16, not the $573.47 gross. Just don't ever re-label the type i
 expense in the UI.
 
 **`EFT` is bidirectional, `TRANSFER` is bidirectional, the rest are one-way.** Only `EFT`,
-`TRANSFER` and `TRANSFER_TF` carry both signs. Categorising `EFT` requires checking the sign
-of `net_cash_amount`, not the sub-type.
+`TRANSFER` and `TRANSFER_TF` carry both signs, so the sub-type alone never tells you which way
+an `EFT` went — but the **description does**, and that is what the app keys on:
+
+| Description | n | Direction |
+|---|---:|---|
+| `Deposit` / `Deposit (executed at …)` | 639 | in |
+| `Withdrawal` / `Withdrawal (executed at …)` | 22 | out |
+
+Both readings agree on this export — all 639 `Deposit` rows are positive and all 22
+`Withdrawal` rows negative, **zero disagreements** — so keying on the description costs
+nothing today and is the stricter rule tomorrow. The sign says which way the money moved; it
+does not say what kind of movement it was, so a sign test also sweeps in any *other*
+non-transfer `MoneyMovement` sub-type that happens to point the same way (`AFT_IN` payroll,
+`E_TRFOUT`) the moment one appears outside a chequing account.
+[`isBankDeposit` / `isBankWithdrawal`](../src/lib/metrics.ts) implement this.
+
+**Match the description template, never a substring.** `Direct deposit received` (the 5
+`AFT_IN` payroll rows) contains the word "Deposit" but is *not* a bank deposit — an
+`includes("Deposit")` test would silently add $9,552.00 to money in. The app compares against
+the whole template after stripping the optional `(executed at <date>)` suffix, which
+Wealthsimple applies inconsistently: the same deposit reads `Deposit` on one row and
+`Deposit (executed at 2026-06-04)` on the next (383 bare vs 256 suffixed).
 
 **`TRANSFER` is overloaded.** Three distinct descriptions share the sub-type:
 
@@ -209,14 +229,14 @@ of `net_cash_amount`, not the sub-type.
 | `Credit card payment` | 9 | **External** — paying the WS credit card |
 
 The nine `Credit card payment` rows (−$2,579.11 total, all from Chequing) are real spending
-leaving the ecosystem, but they are classified `internal` by
-[metrics.ts](../src/lib/metrics.ts) because the rule is sub-type-based. This is a genuine
-misclassification of ~$2.6k. Distinguishing them needs a description check.
+leaving the ecosystem, not cash moving between the owner's own accounts. They are matched on
+description ahead of the generic transfer rule and land under **Money out** — another case
+where the sub-type is not enough on its own.
 
-**`BonusPayment` ≠ cashback.** [metrics.ts:168](../src/lib/metrics.ts:168) files all
-`BonusPayment` into the `cashback` KPI. That is $83.01, of which only $53.01 is actual
-cashback; the rest is a $25 referral bonus and a $5 giveaway. The number is right for "bonus
-income", the label is wrong for "cashback".
+**`BonusPayment` ≠ cashback.** The five rows total $83.01, of which only $53.01 is actual
+card cash back (`CASHBACK`); the rest is a $25 referral bonus and a $5 giveaway (`REFER`,
+`GIVEAWAY`). `computeKpis` reports these as separate `cashback` and `promo` figures so a
+promo-only period is not labelled "Cash back".
 
 ---
 
@@ -451,6 +471,13 @@ Fixed alongside these, found while verifying:
    ($4,287.25).
 6. **`LegacyCorporateAction` tripped the unknown-type warning** on every real export despite
    being documented and carrying no cash. Added to `KNOWN_ACTIVITY_TYPES`.
+7. **Deposits and withdrawals were split by sign, not by what the row says.** `moneyIn` /
+   `moneyOut` took every non-transfer `MoneyMovement` in a non-cash account and sorted it on
+   the sign of `net_cash_amount`, so the figures were defined by direction rather than by kind
+   — any future positive sub-type in an investment account would have been reported as a bank
+   deposit. Both now key on the description template (`isBankDeposit` / `isBankWithdrawal`),
+   as does `flowBreakdown`'s EFT pair. Totals are unchanged on this export (639 / 22 rows,
+   +72,369.54 / −27,941.64) because sign and description agree on every row. (§3.1)
 
 ### Open
 
