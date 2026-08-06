@@ -12,6 +12,7 @@ import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { YearAnalytics } from "@/components/year-analytics";
 import {
 	computeKpis,
 	EMPTY_FILTERS,
@@ -112,6 +113,12 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 					))}
 				</div>
 			</section>
+
+			<YearAnalytics
+				accountType={accountType}
+				activities={scoped}
+				currency={currency}
+			/>
 
 			<YearBreakdownChart activities={scoped} currency={currency} />
 

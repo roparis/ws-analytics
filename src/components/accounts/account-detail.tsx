@@ -11,6 +11,7 @@ import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { YearAnalytics } from "@/components/year-analytics";
 import {
 	computeKpis,
 	EMPTY_FILTERS,
@@ -107,6 +108,11 @@ export function AccountDetail({
 			</Card>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />
+			<YearAnalytics
+				accountType={accountType}
+				activities={scoped}
+				currency={currency}
+			/>
 			<MoneyFlow activities={scoped} currency={currency} />
 			<ActivityChart activities={scoped} currency={currency} />
 			<MonthBreakdownChart activities={scoped} currency={currency} />

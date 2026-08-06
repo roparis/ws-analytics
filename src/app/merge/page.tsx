@@ -5,13 +5,63 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ConfidenceTag } from "@/components/confidence-tag";
 import { CoverageBar, sourceColor } from "@/components/coverage-bar";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { analyzeMerge, type CoverageSegment } from "@/lib/merge";
 import { formatCurrency, formatDate } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
+import type { Activity } from "@/lib/wealthsimple";
 import { useDatasetStore } from "@/stores/dataset";
+
+// Static: these rows are read-only and never re-render against new props.
+const SKIPPED_COLUMNS: DataTableColumn<Activity>[] = [
+	{
+		key: "transactionDate",
+		header: "Date",
+		sortValue: (row) => row.transactionDate,
+		cell: (row) => formatDate(row.transactionDate),
+	},
+	{
+		key: "accountType",
+		header: "Account",
+		sortValue: (row) => row.accountType,
+		cell: (row) => row.accountType,
+	},
+	{
+		key: "activityType",
+		header: "Activity",
+		sortValue: (row) => row.activityType,
+		cell: (row) => row.activityType,
+	},
+	{
+		key: "description",
+		header: "Description",
+		className: "whitespace-normal",
+		cell: (row) => (
+			<span className="line-clamp-1 text-muted-foreground">
+				{row.description}
+			</span>
+		),
+	},
+	{
+		key: "netCashAmount",
+		header: "Amount",
+		align: "right",
+		sortValue: (row) => row.netCashAmount,
+		cell: (row) => (
+			<span
+				className={cn(
+					"tabular-nums",
+					row.netCashAmount < 0 && "text-destructive",
+				)}
+			>
+				{formatCurrency(row.netCashAmount, row.currency)}
+			</span>
+		),
+	},
+];
 
 export default function MergePage() {
 	const sources = useDatasetStore((state) => state.sources);
@@ -279,50 +329,14 @@ export default function MergePage() {
 							including rows individually — picking rows by hand would
 							double-count transactions that appear in both files.
 						</p>
-						<div className="max-h-80 overflow-auto rounded-2xl border">
-							<table className="w-full text-sm">
-								<tbody>
-									{(analysis.skippedBySource[expanded] ?? [])
-										.slice(0, 200)
-										.map((activity, index) => (
-											// biome-ignore lint/suspicious/noArrayIndexKey: byte-identical rows are exactly what this list surfaces, so a content-derived key would collide; the list is render-only and never reordered
-											<tr className="border-b last:border-0" key={index}>
-												<td className="whitespace-nowrap px-3 py-1.5">
-													{formatDate(activity.transactionDate)}
-												</td>
-												<td className="whitespace-nowrap px-3 py-1.5">
-													{activity.accountType}
-												</td>
-												<td className="whitespace-nowrap px-3 py-1.5">
-													{activity.activityType}
-												</td>
-												<td className="px-3 py-1.5 text-muted-foreground">
-													<span className="line-clamp-1">
-														{activity.description}
-													</span>
-												</td>
-												<td
-													className={cn(
-														"whitespace-nowrap px-3 py-1.5 text-right tabular-nums",
-														activity.netCashAmount < 0 && "text-destructive",
-													)}
-												>
-													{formatCurrency(
-														activity.netCashAmount,
-														activity.currency,
-													)}
-												</td>
-											</tr>
-										))}
-								</tbody>
-							</table>
-						</div>
-						{(analysis.skippedBySource[expanded] ?? []).length > 200 && (
-							<p className="text-muted-foreground text-xs">
-								Showing the first 200 of{" "}
-								{analysis.skippedBySource[expanded].length.toLocaleString()}.
-							</p>
-						)}
+						<DataTable
+							columns={SKIPPED_COLUMNS}
+							dense
+							maxHeightClass="max-h-80"
+							noun="skipped rows"
+							rowKey={(_activity, index) => String(index)}
+							rows={analysis.skippedBySource[expanded] ?? []}
+						/>
 					</CardContent>
 				</Card>
 			)}
