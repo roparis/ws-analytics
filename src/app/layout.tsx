@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { StoreHydrator } from "@/components/store-hydrator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -41,7 +42,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 					enableSystem
 				>
 					<StoreHydrator />
-					<AppShell>{children}</AppShell>
+					{/* Base UI groups tooltip delays per provider, so it lives once at
+					the root rather than around each consumer. */}
+					<TooltipProvider>
+						<AppShell>{children}</AppShell>
+					</TooltipProvider>
 					<Toaster />
 				</ThemeProvider>
 			</body>

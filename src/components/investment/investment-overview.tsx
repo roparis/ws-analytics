@@ -1,0 +1,101 @@
+"use client";
+
+import { useMemo } from "react";
+import { AccountBreakdown } from "@/components/investment/account-breakdown";
+import { AccountTypeBreakdown } from "@/components/investment/account-type-breakdown";
+import { AllocationChart } from "@/components/investment/allocation-chart";
+import { ClosedPositionsTable } from "@/components/investment/closed-positions-table";
+import { ExportSheetDialog } from "@/components/investment/export-sheet-dialog";
+import { HistoryWarning } from "@/components/investment/history-warning";
+import { HoldingsSummary } from "@/components/investment/holdings-summary";
+import { HoldingsTable } from "@/components/investment/holdings-table";
+import { SymbolIncomeTable } from "@/components/investment/symbol-income-table";
+import { Card, CardContent } from "@/components/ui/card";
+import { formatDate } from "@/lib/metrics";
+import { buildPositions } from "@/lib/positions";
+import { useDatasetStore } from "@/stores/dataset";
+
+export function InvestmentOverview() {
+	const dataset = useDatasetStore((state) => state.dataset);
+
+	// The whole page derives from one walk of the activity history.
+	const report = useMemo(() => {
+		if (!dataset) return null;
+		return buildPositions(dataset.activities, { sources: dataset.sources });
+	}, [dataset]);
+
+	if (!dataset || !report) return null;
+
+	const currency = dataset.currencies[0] ?? "CAD";
+	const suspectAccounts = report.byAccount.filter(
+		(account) => account.historyConfidence === "suspect",
+	);
+	const exportProps = {
+		activities: dataset.activities,
+		dataThrough: dataset.dateRange.end,
+		fileName: dataset.fileName,
+		report,
+	};
+
+	return (
+		<main className="flex w-full flex-1 flex-col gap-6 py-6">
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<h1 className="font-semibold text-xl">Investments</h1>
+					<p className="text-muted-foreground text-sm">
+						{report.totals.openCount}{" "}
+						{report.totals.openCount === 1 ? "holding" : "holdings"} across{" "}
+						{report.byAccount.length}{" "}
+						{report.byAccount.length === 1 ? "account" : "accounts"} ·{" "}
+						{formatDate(dataset.dateRange.start)} –{" "}
+						{formatDate(dataset.dateRange.end)}
+					</p>
+				</div>
+				<ExportSheetDialog {...exportProps} variant="default" />
+			</div>
+
+			<HistoryWarning accounts={suspectAccounts} />
+
+			<HoldingsSummary currency={currency} report={report} />
+
+			<AllocationChart
+				byAccountType={report.byAccountType}
+				currency={currency}
+			/>
+
+			<HoldingsTable currency={currency} positions={report.open} />
+
+			<AccountBreakdown accounts={report.byAccount} currency={currency} />
+
+			<AccountTypeBreakdown
+				byAccountType={report.byAccountType}
+				currency={currency}
+			/>
+
+			<ClosedPositionsTable currency={currency} positions={report.closed} />
+
+			<SymbolIncomeTable currency={currency} report={report} />
+
+			{/* Placed here on purpose: this is the point in the page where a reader
+			has seen every figure the export can support and is wondering what the
+			holdings are actually worth. */}
+			<Card size="sm">
+				<CardContent className="flex flex-wrap items-center justify-between gap-4">
+					<div className="flex flex-col gap-1">
+						<h2 className="font-heading font-medium text-base">
+							See what these are worth today
+						</h2>
+						<p className="max-w-prose text-muted-foreground text-sm">
+							The sheet carries your {report.totals.openCount} holdings with a
+							live <code className="text-xs">GOOGLEFINANCE</code> price on each
+							row, converts US-listed prices through a live USD→CAD rate, and
+							works out market value, unrealised gain and what share of the
+							portfolio each position is.
+						</p>
+					</div>
+					<ExportSheetDialog {...exportProps} />
+				</CardContent>
+			</Card>
+		</main>
+	);
+}

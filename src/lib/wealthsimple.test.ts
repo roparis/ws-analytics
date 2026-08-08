@@ -4,6 +4,7 @@ import { type Activity, validateDataset } from "@/lib/wealthsimple";
 function makeActivity(overrides: Partial<Activity> = {}): Activity {
 	return {
 		transactionDate: "2026-01-15",
+		effectiveAt: null,
 		settlementDate: null,
 		accountId: "TEST0001CAD",
 		accountType: "TFSA",
@@ -75,8 +76,18 @@ describe("validateDataset", () => {
 	});
 
 	it("exempts corporate actions, which carry a share delta and no cash", () => {
+		// The correction has to be preceded by the shares it corrects, or it trips
+		// I3 (a symbol can't go short) on the way past.
 		expect(
 			validateDataset([
+				makeActivity({ quantity: 250, netCashAmount: 250 }),
+				buy({
+					description: "TWOU - 2U Inc.: Bought 20 shares at $10.00 per share",
+					netCashAmount: -200,
+					quantity: 20,
+					symbol: "TWOU",
+					unitPrice: 10,
+				}),
 				makeActivity({
 					activityType: "LegacyCorporateAction",
 					activitySubType: "NAME_CHANGE",
@@ -89,11 +100,60 @@ describe("validateDataset", () => {
 		).toEqual([]);
 	});
 
+	it("flags a symbol whose shares go negative (I3)", () => {
+		const problems = validateDataset([
+			makeActivity({ quantity: 250, netCashAmount: 250 }),
+			buy({ netCashAmount: 200, quantity: -2, unitPrice: 100 }),
+		]);
+
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain("which is negative");
+	});
+
+	it("flags a closed position that left a rounding residual (I4)", () => {
+		const problems = validateDataset([
+			makeActivity({ quantity: 250, netCashAmount: 250 }),
+			buy({ netCashAmount: -200, quantity: 2, unitPrice: 100 }),
+			buy({ netCashAmount: 200, quantity: -1.9999999, unitPrice: 100.000005 }),
+		]);
+
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain("rather than exactly 0");
+	});
+
 	it("flags an account whose cash residual went negative (I5)", () => {
 		const problems = validateDataset([buy()]);
 
 		expect(problems).toHaveLength(1);
 		expect(problems[0]).toContain("not a plausible cash balance");
+	});
+
+	it("lets a margin account go negative — that is the loan, not a gap", () => {
+		// Everywhere else a negative balance means rows are missing. On margin it
+		// is ordinary: borrowing against the portfolio is what the account does.
+		expect(
+			validateDataset([
+				makeActivity({
+					accountType: "Non-registered margin",
+					activitySubType: "TRANSFER",
+					description: "Money transfer out of the account",
+					netCashAmount: -500,
+					quantity: -500,
+				}),
+			]),
+		).toEqual([]);
+
+		// The same rows in an ordinary account are still a problem.
+		expect(
+			validateDataset([
+				makeActivity({
+					activitySubType: "TRANSFER",
+					description: "Money transfer out of the account",
+					netCashAmount: -500,
+					quantity: -500,
+				}),
+			]),
+		).toHaveLength(1);
 	});
 
 	it("flags an implausibly large residual", () => {

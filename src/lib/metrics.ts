@@ -98,6 +98,20 @@ export function isCashAccount(accountType: string): boolean {
 }
 
 /**
+ * A margin account can legitimately hold a *negative* cash balance — borrowing
+ * against the portfolio is what it is for, and the `InterestCharged` rows are
+ * the interest on exactly that.
+ *
+ * Everywhere else a negative balance is arithmetically impossible and means
+ * rows are missing, so the completeness checks lean on it heavily. Here it is
+ * ordinary, and treating it as damage would flag a perfectly good account as
+ * having an incomplete history.
+ */
+export function isMarginAccount(accountType: string): boolean {
+	return accountType.toLowerCase().includes("margin");
+}
+
+/**
  * Wealthsimple appends `(executed at <date>)` to some descriptions and not
  * others — the same bank deposit reads `Deposit` on one row and
  * `Deposit (executed at 2026-06-04)` on the next. Strip the suffix so a

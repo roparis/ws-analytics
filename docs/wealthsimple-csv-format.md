@@ -34,6 +34,30 @@ standing between the footer and a `NaN` in every total.
 The timestamp is genuinely useful metadata (it is the "data is current as of" watermark) but
 is currently discarded. Capturing it would let the UI say how stale a source is.
 
+### 1.3 The date column was renamed, and gained a time
+
+Exports from around August 2026 replace `transaction_date` with **`effective_at`**, and
+change its type from a bare `YYYY-MM-DD` to a full ISO timestamp carrying the account's UTC
+offset:
+
+```
+transaction_date   2026-08-01
+effective_at       2026-08-06T15:31:21-04:00
+```
+
+[wealthsimple.ts](../src/lib/wealthsimple.ts) accepts either. Two rules matter:
+
+1. **Take the calendar date by slicing the first ten characters, never by parsing to a
+   `Date`.** The timestamp already states the date in the account's own timezone, so
+   converting to UTC pushes every transaction after 20:00 local onto the following day —
+   silently moving trades between months and tax years.
+2. **The time is real information.** §1.2 below was written against the old format and still
+   applies to it; where `effective_at` is present, same-day activity *can* be ordered by when
+   it actually happened, and `positions.ts` does exactly that. The buys-before-sells
+   convention is now a fallback for date-only files rather than the only option.
+
+The footer row survives this change and is still dropped by the same leading-date test.
+
 ### 1.2 Ordering is day-level only, never intra-day
 
 Rows within a single date are **not** in execution order. On 2025-10-06 the Group RRSP
@@ -49,7 +73,7 @@ only meaningful at end-of-day or coarser boundaries.
 
 | # | Column | Type | Populated | Notes |
 |---|---|---|---|---|
-| 1 | `transaction_date` | `YYYY-MM-DD` | 2902/2902 | Trade/effective date. The reporting date. |
+| 1 | `effective_at` | ISO timestamp | all | **Renamed, see §1.3.** Was `transaction_date` (`YYYY-MM-DD`). |
 | 2 | `settlement_date` | `YYYY-MM-DD` | 1541/2902 | **Trade rows only.** Empty for everything else. |
 | 3 | `account_id` | string | 2902/2902 | Opaque account key. 8 distinct. |
 | 4 | `account_type` | string | 2902/2902 | Display label. **Not unique per account** — see §5. |
@@ -325,12 +349,21 @@ parsing bug or a change in Wealthsimple's export.
 | I2 | `quantity == net_cash_amount` on every non-`Trade`, non-`LegacyCorporateAction` row | 1359/1359 ✅ |
 | I3 | `Σ quantity` per `symbol` over `Trade`+`LegacyCorporateAction` is never negative | 44/44 symbols ✅ |
 | I4 | Fully-exited positions land on exactly `0.000000`, not a dust residual | 19/19 closed ✅ |
-| I5 | `Σ net_cash_amount` per account is a small non-negative residual (the cash balance) | 8/8 ✅ |
+| I5 | `Σ net_cash_amount` per account is the cash balance — non-negative **except on margin** | 8/8 ✅ |
 | I6 | `TRANSFER_TF` nets to exactly 0.00 across all accounts in the export | ✅ |
 | I7 | `settlement_date` is set iff `activity_type == 'Trade'` | ✅ |
 | I8 | `symbol` is set iff type ∈ {`Trade`, `Dividend`, `LegacyCorporateAction`} | ✅ |
 | I9 | The `executed at` date in `description` always equals `transaction_date` | 2071/2071 ✅ |
 | I10 | The `received on` date on dividends always equals `transaction_date` | 398/398 ✅ |
+
+### 6.0 I5 does not apply to margin accounts
+
+A margin account can hold a legitimately **negative** cash balance — borrowing against the
+portfolio is what it is for, and the `InterestCharged` rows are the interest on exactly that.
+The reference export happened to have no drawn margin, so the invariant looked universal; a
+later export draws $500 and would be wrongly reported as missing rows. `isMarginAccount` in
+[metrics.ts](../src/lib/metrics.ts) exempts it in both `validateDataset` and the per-account
+history check. The upper bound still applies.
 
 ### 6.1 I5 is the headline validation check
 
