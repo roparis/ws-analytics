@@ -10,6 +10,7 @@ import type { Activity } from "@/lib/wealthsimple";
 function makeActivity(overrides: Partial<Activity> = {}): Activity {
 	return {
 		transactionDate: "2026-01-15",
+		effectiveAt: null,
 		settlementDate: null,
 		accountId: "TEST0001CAD",
 		accountType: "TFSA",

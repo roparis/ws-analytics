@@ -1,6 +1,11 @@
 "use client";
 
-import { GitMerge, Home, LayoutDashboard } from "lucide-react";
+import {
+	ChartCandlestick,
+	GitMerge,
+	Home,
+	LayoutDashboard,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -12,6 +17,8 @@ import { useDatasetStore } from "@/stores/dataset";
 const NAV = [
 	{ href: "/", label: "Timeline", Icon: Home },
 	{ href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+	{ href: "/investment", label: "Investments", Icon: ChartCandlestick },
+	// Merge is the utility, so it stays last.
 	{ href: "/merge", label: "Merge", Icon: GitMerge },
 ] as const;
 
@@ -109,7 +116,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 				{NAV.map(({ href, label, Icon }) => (
 					<Link
 						className={cn(
-							"flex flex-1 flex-col items-center gap-1 py-2.5 text-xs transition-colors",
+							// `whitespace-nowrap` keeps a longer label on one line: a wrapped
+							// tab would be taller than its neighbours and shift the bar.
+							"flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 text-xs transition-colors",
 							isActive(pathname, href)
 								? "font-medium text-foreground"
 								: "text-muted-foreground",
