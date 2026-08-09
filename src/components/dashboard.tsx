@@ -1,6 +1,5 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
 	AccountGroupList,
@@ -9,7 +8,6 @@ import {
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { CapitalChart } from "@/components/charts/capital-chart";
-import { CsvUploader } from "@/components/csv-uploader";
 import {
 	DashboardFilters,
 	type DatePreset,
@@ -18,8 +16,6 @@ import {
 import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
 import { PdfExportButton } from "@/components/pdf-export-button";
-import { SourcesPanel } from "@/components/sources-panel";
-import { Button } from "@/components/ui/button";
 import {
 	type ActivityFilters,
 	computeKpis,
@@ -31,7 +27,6 @@ import { useDatasetStore } from "@/stores/dataset";
 
 export function Dashboard() {
 	const dataset = useDatasetStore((state) => state.dataset);
-	const clear = useDatasetStore((state) => state.clear);
 	const reportRef = useRef<HTMLDivElement>(null);
 	const [filters, setFilters] = useState<ActivityFilters>(EMPTY_FILTERS);
 	const [datePreset, setDatePreset] = useState<DatePreset>("all");
@@ -122,29 +117,14 @@ export function Dashboard() {
 
 	return (
 		<div className="flex flex-1 flex-col gap-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="font-semibold text-lg">{dataset.fileName}</h1>
-					<p className="text-muted-foreground text-sm">
-						{dataset.activities.length.toLocaleString()} activities ·{" "}
-						{dataset.accounts.length} accounts
-					</p>
-				</div>
-				<div className="flex flex-wrap gap-2">
-					<CsvUploader compact />
-					<Button
-						onClick={clear}
-						title="Removes these files from this device, including the copy saved in your browser"
-						variant="ghost"
-					>
-						<Trash2 className="size-4" />
-						Clear data
-					</Button>
-					<PdfExportButton
-						filename={`${dataset.fileName.replace(/\.csv$/i, "")}-report.pdf`}
-						targetRef={reportRef}
-					/>
-				</div>
+			{/* The files themselves are the sidebar's business — this header only
+			carries the one action that belongs to the dashboard. */}
+			<div className="flex items-center justify-between gap-3">
+				<h1 className="font-semibold text-lg">Dashboard</h1>
+				<PdfExportButton
+					filename={`${dataset.fileName.replace(/\.csv$/i, "")}-report.pdf`}
+					targetRef={reportRef}
+				/>
 			</div>
 
 			<div className="flex flex-col gap-8 bg-background" ref={reportRef}>
@@ -162,7 +142,6 @@ export function Dashboard() {
 					earnedFor={earnedIn}
 				/>
 
-				<SourcesPanel sources={dataset.sources} />
 				<DashboardFilters
 					dataset={dataset}
 					datePreset={datePreset}
@@ -176,7 +155,7 @@ export function Dashboard() {
 					kpis={kpis}
 				/>
 				<MoneyFlow activities={filtered} currency={currency} />
-				<ActivityChart activities={filtered} currency={currency} />
+				{/* <ActivityChart activities={filtered} currency={currency} /> */}
 				<ActivitiesTable activities={filtered} currency={currency} />
 			</div>
 		</div>

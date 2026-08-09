@@ -109,7 +109,7 @@ export function MonthDetail({ monthKey }: { monthKey: string }) {
 
 			<KpiCards currency={currency} isAccountFiltered={isScoped} kpis={kpis} />
 			<MoneyFlow activities={scoped} currency={currency} />
-			<ActivityChart activities={scoped} currency={currency} />
+			{/* <ActivityChart activities={scoped} currency={currency} /> */}
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>
 	);
