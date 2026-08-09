@@ -1,10 +1,11 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { AccountTypeCards } from "@/components/accounts/account-type-cards";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { AccountGroupList } from "@/components/accounts/account-group-list";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
+import { CapitalChart } from "@/components/charts/capital-chart";
 import { CsvUploader } from "@/components/csv-uploader";
 import {
 	DashboardFilters,
@@ -22,6 +23,7 @@ import {
 	EMPTY_FILTERS,
 	filterActivities,
 } from "@/lib/metrics";
+import { buildPositions } from "@/lib/positions";
 import { useDatasetStore } from "@/stores/dataset";
 
 export function Dashboard() {
@@ -43,6 +45,26 @@ export function Dashboard() {
 
 	const kpis = useMemo(() => computeKpis(filtered), [filtered]);
 
+	// What each account holds, at what it cost, plus whatever cash sits in it. A
+	// brokerage would show market value here; the export has no prices, so this
+	// is the closest figure the file actually supports.
+	const report = useMemo(
+		() =>
+			dataset
+				? buildPositions(dataset.activities, { sources: dataset.sources })
+				: null,
+		[dataset],
+	);
+	const heldAtCost = useCallback(
+		(accountId: string) => {
+			const account = report?.byAccount.find(
+				(candidate) => candidate.accountId === accountId,
+			);
+			return account ? account.bookCost + account.cashBalance : 0;
+		},
+		[report],
+	);
+
 	if (!dataset) return null;
 
 	const currency = dataset.currencies[0] ?? "CAD";
@@ -59,7 +81,7 @@ export function Dashboard() {
 						{dataset.accounts.length} accounts
 					</p>
 				</div>
-				<div className="flex gap-2">
+				<div className="flex flex-wrap gap-2">
 					<CsvUploader compact />
 					<Button
 						onClick={clear}
@@ -76,9 +98,21 @@ export function Dashboard() {
 				</div>
 			</div>
 
-			<div className="flex flex-col gap-6 bg-background" ref={reportRef}>
+			<div className="flex flex-col gap-8 bg-background" ref={reportRef}>
+				<CapitalChart
+					activities={dataset.activities}
+					currency={currency}
+					datasetEnd={datasetEnd}
+				/>
+
+				<AccountGroupList
+					activities={dataset.activities}
+					amountFor={heldAtCost}
+					caption="Holdings at what you paid for them, plus uninvested cash. Not market value — that isn't in the export."
+					currency={currency}
+				/>
+
 				<SourcesPanel sources={dataset.sources} />
-				<AccountTypeCards currency={currency} dataset={dataset} />
 				<DashboardFilters
 					dataset={dataset}
 					datePreset={datePreset}

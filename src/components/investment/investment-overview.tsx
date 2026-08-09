@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { AccountGroupList } from "@/components/accounts/account-group-list";
+import { CapitalChart } from "@/components/charts/capital-chart";
 import { AccountBreakdown } from "@/components/investment/account-breakdown";
 import { AccountTypeBreakdown } from "@/components/investment/account-type-breakdown";
 import { AllocationChart } from "@/components/investment/allocation-chart";
@@ -24,12 +26,22 @@ export function InvestmentOverview() {
 		return buildPositions(dataset.activities, { sources: dataset.sources });
 	}, [dataset]);
 
+	const currency = dataset?.currencies[0] ?? "CAD";
+	const suspectAccounts =
+		report?.byAccount.filter(
+			(account) => account.historyConfidence === "suspect",
+		) ?? [];
+	// Stable across renders: `AccountGroupList` keys a memo on this, so a fresh
+	// arrow each time would re-group and re-sort the whole list for nothing.
+	const bookCostFor = useCallback(
+		(accountId: string) =>
+			report?.byAccount.find((account) => account.accountId === accountId)
+				?.bookCost ?? 0,
+		[report],
+	);
+
 	if (!dataset || !report) return null;
 
-	const currency = dataset.currencies[0] ?? "CAD";
-	const suspectAccounts = report.byAccount.filter(
-		(account) => account.historyConfidence === "suspect",
-	);
 	const exportProps = {
 		activities: dataset.activities,
 		dataThrough: dataset.dateRange.end,
@@ -56,6 +68,13 @@ export function InvestmentOverview() {
 
 			<HistoryWarning accounts={suspectAccounts} />
 
+			<CapitalChart
+				activities={dataset.activities}
+				currency={currency}
+				datasetEnd={dataset.dateRange.end}
+				label="Invested in the market"
+			/>
+
 			<HoldingsSummary currency={currency} report={report} />
 
 			<AllocationChart
@@ -64,6 +83,13 @@ export function InvestmentOverview() {
 			/>
 
 			<HoldingsTable currency={currency} positions={report.open} />
+
+			<AccountGroupList
+				activities={dataset.activities}
+				amountFor={bookCostFor}
+				caption="Book cost of the holdings in each account."
+				currency={currency}
+			/>
 
 			<AccountBreakdown accounts={report.byAccount} currency={currency} />
 

@@ -9,6 +9,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { ReturnPill } from "@/components/ui/figures";
 import { formatCurrency, formatDate } from "@/lib/metrics";
 import type { Position } from "@/lib/positions";
 import { cn } from "@/lib/utils";
@@ -87,9 +88,14 @@ export function ClosedPositionsTable({
 						: position.realizedPnl / position.invested,
 				className: "tabular-nums",
 				cell: (position) =>
-					position.invested === 0
-						? "—"
-						: `${((position.realizedPnl / position.invested) * 100).toFixed(1)}%`,
+					position.invested === 0 ? (
+						"—"
+					) : (
+						<ReturnPill
+							label="Realised return on what you paid, excluding dividends"
+							value={position.realizedPnl / position.invested}
+						/>
+					),
 			},
 			{
 				key: "dividends",

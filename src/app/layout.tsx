@@ -4,6 +4,7 @@ import "@/styles/globals.css";
 import { AppShell } from "@/components/app-shell";
 import { StoreHydrator } from "@/components/store-hydrator";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PreferencesHydrator } from "@/components/ui/figures";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 					enableSystem
 				>
 					<StoreHydrator />
+					<PreferencesHydrator />
 					{/* Base UI groups tooltip delays per provider, so it lives once at
 					the root rather than around each consumer. */}
 					<TooltipProvider>

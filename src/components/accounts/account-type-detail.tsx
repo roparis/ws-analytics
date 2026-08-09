@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { AccountCard } from "@/components/accounts/account-card";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
+import { CapitalChart } from "@/components/charts/capital-chart";
 import { YearBreakdownChart } from "@/components/charts/year-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
 import { KpiCards } from "@/components/kpi-cards";
@@ -102,6 +103,13 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 				Scoped to one account type, so transfers from your other Wealthsimple
 				accounts no longer cancel out — they count as money arriving here.
 			</p>
+
+			<CapitalChart
+				activities={scoped}
+				currency={currency}
+				datasetEnd={dataset.dateRange.end}
+				label="Invested in this account type"
+			/>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />
 

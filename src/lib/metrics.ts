@@ -778,3 +778,67 @@ export function formatDate(value: string): string {
 		day: "numeric",
 	});
 }
+
+export interface CapitalPoint {
+	/** `YYYY-MM-DD`. */
+	date: string;
+	/** Cumulative cash spent on buys minus cash returned by sells, to this date. */
+	invested: number;
+	/** Cumulative distributions, interest and bonuses to this date. */
+	income: number;
+	/** Cumulative fees, margin interest and tax, as a positive magnitude. */
+	costs: number;
+	/** Cumulative uninvested cash across every account — Σ net cash to this date. */
+	cash: number;
+}
+
+/**
+ * The running story of where money has gone, one point per day that had
+ * activity.
+ *
+ * This is the honest counterpart to a brokerage's net-worth line. That line
+ * plots *market value*, which needs prices the export doesn't contain (§8).
+ * What the file does support exactly is how much capital has been put to work
+ * and what it has paid out — so that is what this returns, and a caller must
+ * label it as such rather than implying it is a valuation.
+ *
+ * Oldest first, because it is read left to right.
+ */
+export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
+	const byDate = new Map<string, Activity[]>();
+	for (const activity of activities) {
+		const bucket = byDate.get(activity.transactionDate);
+		if (bucket) bucket.push(activity);
+		else byDate.set(activity.transactionDate, [activity]);
+	}
+
+	const running = { invested: 0, income: 0, costs: 0, cash: 0 };
+
+	return [...byDate.entries()]
+		.sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([date, rows]) => {
+			// Delegates the classification rather than re-deriving it, so this line
+			// and the KPI tiles can never disagree about what counts as income.
+			const kpis = computeKpis(rows);
+			running.invested += kpis.netCapitalDeployed;
+			running.income += kpis.income;
+			running.costs += kpis.costs;
+			running.cash += kpis.netCashFlow;
+			return { date, ...running };
+		});
+}
+
+/**
+ * Trims a series to a preset window, keeping the point immediately before the
+ * cut so a cumulative line starts from its true running total rather than
+ * springing from zero.
+ */
+export function sinceDate(
+	points: CapitalPoint[],
+	from: string | null,
+): CapitalPoint[] {
+	if (!from) return points;
+	const firstInside = points.findIndex((point) => point.date >= from);
+	if (firstInside <= 0) return firstInside === 0 ? points : [];
+	return points.slice(firstInside - 1);
+}

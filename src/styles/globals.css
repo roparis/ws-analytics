@@ -49,7 +49,10 @@
 }
 
 :root {
-	--background: oklch(1 0 0);
+	/* The page sits a step below the cards, so a card reads as a raised
+	   surface rather than an outlined region of the same white. Dark mode
+	   already works this way — this brings light mode into line. */
+	--background: oklch(0.968 0.002 210);
 	--foreground: oklch(0.148 0.004 228.8);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.148 0.004 228.8);
