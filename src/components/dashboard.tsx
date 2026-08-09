@@ -65,10 +65,11 @@ export function Dashboard() {
 		[report],
 	);
 
-	// Bank-boundary withdrawals only. A transfer to another Wealthsimple account
-	// left this account but not your hands, so counting it as "withdrawn" would
-	// overstate what actually came out.
-	const withdrawnFrom = useCallback(
+	// Every cash movement across the account's boundary, netted — deposits from
+	// your bank and transfers from your other Wealthsimple accounts alike. The
+	// counterparty doesn't change the fact that the money arrived, and counting
+	// only the bank side made a transfer-funded account look drained.
+	const fundedFor = useCallback(
 		(accountId: string) => {
 			if (!dataset) return 0;
 			return computeKpis(
@@ -76,7 +77,7 @@ export function Dashboard() {
 					...EMPTY_FILTERS,
 					accountIds: [accountId],
 				}),
-			).moneyOut;
+			).netDeposits;
 		},
 		[dataset],
 	);
@@ -124,9 +125,9 @@ export function Dashboard() {
 				<AccountGroupList
 					activities={dataset.activities}
 					amountFor={heldAtCost}
-					caption="Holdings at what you paid for them, plus uninvested cash. Withdrawals are shown beside the value rather than taken off it — an account can hold a lot and have had a lot taken out, because deposits, dividends and sale proceeds all funded it."
+					caption="Holdings at what you paid for them, plus uninvested cash. Underneath, the money you put in — from your bank or from your other accounts, net of anything moved back out. The gap between the two is what the holdings earned."
 					currency={currency}
-					withdrawnFor={withdrawnFrom}
+					fundedFor={fundedFor}
 				/>
 
 				<SourcesPanel sources={dataset.sources} />
