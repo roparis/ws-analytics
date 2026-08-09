@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
-import { ActivityChart } from "@/components/charts/activity-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
 import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
@@ -109,7 +108,6 @@ export function MonthDetail({ monthKey }: { monthKey: string }) {
 
 			<KpiCards currency={currency} isAccountFiltered={isScoped} kpis={kpis} />
 			<MoneyFlow activities={scoped} currency={currency} />
-			{/* <ActivityChart activities={scoped} currency={currency} /> */}
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>
 	);

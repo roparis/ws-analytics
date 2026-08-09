@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
-import { ActivityChart } from "@/components/charts/activity-chart";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import { MonthBreakdownChart } from "@/components/charts/month-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
@@ -107,7 +106,6 @@ export function AccountDetail({
 				currency={currency}
 			/>
 			<MoneyFlow activities={scoped} currency={currency} />
-			{/* <ActivityChart activities={scoped} currency={currency} /> */}
 			<MonthBreakdownChart activities={scoped} currency={currency} />
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>
