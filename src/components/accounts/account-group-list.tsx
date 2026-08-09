@@ -31,12 +31,29 @@ interface AccountGroupListProps {
 	 * object already has, and TypeScript resolves the prop against the built-in.
 	 */
 	amountFor?: (accountId: string) => number;
+	/**
+	 * Cash taken out of the account, as a positive magnitude. Shown beside the
+	 * value rather than subtracted from it: an account can hold a large position
+	 * *and* have had a lot withdrawn, because deposits, dividends and recycled
+	 * sale proceeds all funded it over time. Netting the two would produce a
+	 * figure that is neither what you hold nor what you put in.
+	 */
+	withdrawnFor?: (accountId: string) => number;
+}
+
+interface AccountRow {
+	id: string;
+	total: number;
+	withdrawn: number;
+	count: number;
+	last: string;
 }
 
 interface TypeGroup {
 	accountType: string;
-	accounts: { id: string; total: number; count: number; last: string }[];
+	accounts: AccountRow[];
 	total: number;
+	withdrawn: number;
 }
 
 export function AccountGroupList({
@@ -44,6 +61,7 @@ export function AccountGroupList({
 	currency,
 	caption,
 	amountFor,
+	withdrawnFor,
 }: AccountGroupListProps) {
 	const groups = useMemo<TypeGroup[]>(() => {
 		const byType = new Map<string, TypeGroup>();
@@ -53,18 +71,27 @@ export function AccountGroupList({
 				? amountFor(account.id)
 				: account.kpis.netCashFlow;
 
+			const withdrawn = withdrawnFor?.(account.id) ?? 0;
+
 			let group = byType.get(account.accountType);
 			if (!group) {
-				group = { accountType: account.accountType, accounts: [], total: 0 };
+				group = {
+					accountType: account.accountType,
+					accounts: [],
+					total: 0,
+					withdrawn: 0,
+				};
 				byType.set(account.accountType, group);
 			}
 			group.accounts.push({
 				id: account.id,
 				total,
+				withdrawn,
 				count: account.kpis.count,
 				last: account.kpis.dateRange.end,
 			});
 			group.total += total;
+			group.withdrawn += withdrawn;
 		}
 
 		return [...byType.values()]
@@ -73,7 +100,7 @@ export function AccountGroupList({
 				accounts: group.accounts.sort((a, b) => b.total - a.total),
 			}))
 			.sort((a, b) => b.total - a.total);
-	}, [activities, amountFor]);
+	}, [activities, amountFor, withdrawnFor]);
 
 	const [open, setOpen] = useState<string[]>([]);
 
@@ -114,11 +141,19 @@ export function AccountGroupList({
 									</span>
 								</Link>
 
-								<Amount
-									className="font-medium"
-									currency={currency}
-									value={group.total}
-								/>
+								<span className="flex flex-col items-end">
+									<Amount
+										className="font-medium"
+										currency={currency}
+										value={group.total}
+									/>
+									{group.withdrawn > 0 && (
+										<span className="text-muted-foreground text-xs">
+											<Amount currency={currency} value={group.withdrawn} />{" "}
+											withdrawn
+										</span>
+									)}
+								</span>
 
 								{expandable && (
 									<button
@@ -161,7 +196,18 @@ export function AccountGroupList({
 													{formatDate(account.last)}
 												</span>
 											</span>
-											<Amount currency={currency} value={account.total} />
+											<span className="flex flex-col items-end">
+												<Amount currency={currency} value={account.total} />
+												{account.withdrawn > 0 && (
+													<span className="text-muted-foreground text-xs">
+														<Amount
+															currency={currency}
+															value={account.withdrawn}
+														/>{" "}
+														withdrawn
+													</span>
+												)}
+											</span>
 										</Link>
 									))}
 								</div>
