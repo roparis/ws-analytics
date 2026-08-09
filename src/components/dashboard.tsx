@@ -65,6 +65,22 @@ export function Dashboard() {
 		[report],
 	);
 
+	// Bank-boundary withdrawals only. A transfer to another Wealthsimple account
+	// left this account but not your hands, so counting it as "withdrawn" would
+	// overstate what actually came out.
+	const withdrawnFrom = useCallback(
+		(accountId: string) => {
+			if (!dataset) return 0;
+			return computeKpis(
+				filterActivities(dataset.activities, {
+					...EMPTY_FILTERS,
+					accountIds: [accountId],
+				}),
+			).moneyOut;
+		},
+		[dataset],
+	);
+
 	if (!dataset) return null;
 
 	const currency = dataset.currencies[0] ?? "CAD";
@@ -108,8 +124,9 @@ export function Dashboard() {
 				<AccountGroupList
 					activities={dataset.activities}
 					amountFor={heldAtCost}
-					caption="Holdings at what you paid for them, plus uninvested cash. Not market value — that isn't in the export."
+					caption="Holdings at what you paid for them, plus uninvested cash. Withdrawals are shown beside the value rather than taken off it — an account can hold a lot and have had a lot taken out, because deposits, dividends and sale proceeds all funded it."
 					currency={currency}
+					withdrawnFor={withdrawnFrom}
 				/>
 
 				<SourcesPanel sources={dataset.sources} />
