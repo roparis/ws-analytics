@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
@@ -74,27 +73,13 @@ export function AccountDetail({
 
 	return (
 		<main className="flex w-full flex-1 flex-col gap-6 py-6">
-			<div className="flex flex-col gap-3">
-				<Button
-					className="w-fit"
-					nativeButton={false}
-					render={
-						<Link href={`/accounts/${encodeURIComponent(accountType)}`}>
-							<ArrowLeft className="size-4" />
-							{accountType}
-						</Link>
-					}
-					size="sm"
-					variant="ghost"
-				/>
-				<div>
-					<h1 className="font-semibold text-xl">{resolvedId}</h1>
-					<p className="text-muted-foreground text-sm">
-						{accountType} · {kpis.count.toLocaleString()} activities ·{" "}
-						{formatDate(kpis.dateRange.start)} –{" "}
-						{formatDate(kpis.dateRange.end)}
-					</p>
-				</div>
+			{/* No back link here — the breadcrumb in the shell is the way up. */}
+			<div>
+				<h1 className="font-semibold text-xl">{resolvedId}</h1>
+				<p className="text-muted-foreground text-sm">
+					{accountType} · {kpis.count.toLocaleString()} activities ·{" "}
+					{formatDate(kpis.dateRange.start)} – {formatDate(kpis.dateRange.end)}
+				</p>
 			</div>
 
 			<Card size="sm">

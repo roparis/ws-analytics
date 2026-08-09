@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
@@ -61,26 +60,13 @@ export function MonthDetail({ monthKey }: { monthKey: string }) {
 
 	return (
 		<main className="flex w-full flex-1 flex-col gap-6 py-6">
-			<div className="flex flex-col gap-3">
-				<Button
-					className="w-fit"
-					nativeButton={false}
-					render={
-						<Link href="/">
-							<ArrowLeft className="size-4" />
-							Timeline
-						</Link>
-					}
-					size="sm"
-					variant="ghost"
-				/>
-				<div>
-					<h1 className="font-semibold text-xl">{group.label}</h1>
-					<p className="text-muted-foreground text-sm">
-						{kpis.count.toLocaleString()} activities
-						{isScoped ? ` in ${accountType}` : " across all accounts"}
-					</p>
-				</div>
+			{/* No back link here — the breadcrumb in the shell is the way up. */}
+			<div>
+				<h1 className="font-semibold text-xl">{group.label}</h1>
+				<p className="text-muted-foreground text-sm">
+					{kpis.count.toLocaleString()} activities
+					{isScoped ? ` in ${accountType}` : " across all accounts"}
+				</p>
 			</div>
 
 			<div className="flex flex-wrap items-center gap-2">

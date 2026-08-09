@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CsvUploader } from "@/components/csv-uploader";
 import { matchDatasetValue } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					<span className="font-semibold">ws-analytics</span>
 					<CsvUploader compact />
 				</div>
+				<Breadcrumbs />
 				{children}
 			</div>
 
