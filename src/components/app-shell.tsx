@@ -1,26 +1,21 @@
 "use client";
 
-import {
-	ChartCandlestick,
-	GitMerge,
-	Home,
-	LayoutDashboard,
-} from "lucide-react";
+import { ChartCandlestick, Home, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { CsvUploader } from "@/components/csv-uploader";
+import { DataSourceCard } from "@/components/data-source-card";
 import { matchDatasetValue } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import { useDatasetStore } from "@/stores/dataset";
 
+// Merge is deliberately absent: it's reached from the data card at the foot of
+// the sidebar, which is the one place the app talks about files.
 const NAV = [
 	{ href: "/", label: "Timeline", Icon: Home },
 	{ href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
 	{ href: "/investment", label: "Investments", Icon: ChartCandlestick },
-	// Merge is the utility, so it stays last.
-	{ href: "/merge", label: "Merge", Icon: GitMerge },
 ] as const;
 
 // A stable empty-array fallback: returning `[]` inline from a selector would
@@ -99,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					)}
 
 					<div className="mt-auto">
-						<CsvUploader compact />
+						<DataSourceCard />
 					</div>
 				</div>
 			</header>
@@ -108,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 				{/* Mobile header — the sidebar is hidden below lg. */}
 				<div className="flex items-center justify-between py-4 lg:hidden">
 					<span className="font-semibold">ws-analytics</span>
-					<CsvUploader compact />
+					<DataSourceCard compact />
 				</div>
 				<Breadcrumbs />
 				{children}

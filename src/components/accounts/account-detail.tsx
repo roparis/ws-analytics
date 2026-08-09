@@ -107,7 +107,7 @@ export function AccountDetail({
 				currency={currency}
 			/>
 			<MoneyFlow activities={scoped} currency={currency} />
-			<ActivityChart activities={scoped} currency={currency} />
+			{/* <ActivityChart activities={scoped} currency={currency} /> */}
 			<MonthBreakdownChart activities={scoped} currency={currency} />
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>

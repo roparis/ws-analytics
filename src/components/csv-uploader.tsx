@@ -13,9 +13,11 @@ import { useDatasetStore } from "@/stores/dataset";
 interface CsvUploaderProps {
 	/** Compact variant for adding more files once a dashboard is on screen. */
 	compact?: boolean;
+	/** Applied to the compact button, so a caller can stretch it to fit. */
+	className?: string;
 }
 
-export function CsvUploader({ compact = false }: CsvUploaderProps) {
+export function CsvUploader({ compact = false, className }: CsvUploaderProps) {
 	const addSources = useDatasetStore((state) => state.addSources);
 	const router = useRouter();
 	const [isDragging, setIsDragging] = useState(false);
@@ -106,6 +108,7 @@ export function CsvUploader({ compact = false }: CsvUploaderProps) {
 		return (
 			<>
 				<Button
+					className={className}
 					disabled={progress !== null}
 					onClick={() => inputRef.current?.click()}
 					size="sm"
