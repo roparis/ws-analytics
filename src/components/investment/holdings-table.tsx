@@ -3,7 +3,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { Badge } from "@/components/ui/badge";
 import {
 	Card,
 	CardContent,
@@ -11,6 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { AllocationDonut, Amount } from "@/components/ui/figures";
 import { formatCurrency, formatDate } from "@/lib/metrics";
 import { LISTING_LABELS, type Position } from "@/lib/positions";
 
@@ -26,7 +26,26 @@ interface HoldingsTableProps {
 	currency: string;
 }
 
+/**
+ * Where a holding trades decides the currency it is quoted in — the export's
+ * `currency` column is the *account's* and is a constant CAD, so the listing
+ * inference is the only thing that can answer this.
+ */
+const QUOTE_CURRENCY: Record<Position["listing"], string> = {
+	ca: "CAD",
+	us: "USD",
+	crypto: "CAD",
+	unknown: "—",
+};
+
 export function HoldingsTable({ positions, currency }: HoldingsTableProps) {
+	// Allocation is by book cost, which is the only weight the file supports.
+	// A brokerage weights by market value; saying so in the header keeps the two
+	// from being read as the same thing.
+	const totalBookCost = useMemo(
+		() => positions.reduce((sum, position) => sum + position.bookCost, 0),
+		[positions],
+	);
 	const columns = useMemo<DataTableColumn<Position>[]>(
 		() => [
 			{
@@ -53,12 +72,33 @@ export function HoldingsTable({ positions, currency }: HoldingsTableProps) {
 				),
 			},
 			{
-				key: "listing",
-				header: "Listing",
-				sortValue: (position) => position.listing,
+				key: "currency",
+				header: "Currency",
+				sortValue: (position) => QUOTE_CURRENCY[position.listing],
 				cell: (position) => (
-					<Badge variant="secondary">{LISTING_LABELS[position.listing]}</Badge>
+					<span
+						className="text-muted-foreground"
+						title={LISTING_LABELS[position.listing]}
+					>
+						{QUOTE_CURRENCY[position.listing]}
+					</span>
 				),
+			},
+			{
+				key: "allocation",
+				header: "Allocation",
+				align: "right",
+				sortValue: (position) => position.bookCost,
+				cell: (position) => {
+					const share =
+						totalBookCost > 0 ? position.bookCost / totalBookCost : 0;
+					return (
+						<span className="inline-flex items-center justify-end gap-1.5 tabular-nums">
+							{(share * 100).toFixed(2)}%
+							<AllocationDonut share={share} />
+						</span>
+					);
+				},
 			},
 			{
 				key: "account",
@@ -87,7 +127,9 @@ export function HoldingsTable({ positions, currency }: HoldingsTableProps) {
 				align: "right",
 				sortValue: (position) => position.bookCost,
 				className: "tabular-nums",
-				cell: (position) => formatCurrency(position.bookCost, currency),
+				cell: (position) => (
+					<Amount currency={currency} value={position.bookCost} />
+				),
 			},
 			{
 				key: "averageCost",
@@ -119,7 +161,7 @@ export function HoldingsTable({ positions, currency }: HoldingsTableProps) {
 					position.firstTradeDate ? formatDate(position.firstTradeDate) : "—",
 			},
 		],
-		[currency],
+		[currency, totalBookCost],
 	);
 
 	return (

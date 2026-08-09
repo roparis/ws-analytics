@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
+import { CapitalChart } from "@/components/charts/capital-chart";
 import { MonthBreakdownChart } from "@/components/charts/month-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
 import { KpiCards } from "@/components/kpi-cards";
@@ -106,6 +107,13 @@ export function AccountDetail({
 					/>
 				</CardContent>
 			</Card>
+
+			<CapitalChart
+				activities={scoped}
+				currency={currency}
+				datasetEnd={dataset.dateRange.end}
+				label="Invested in this account"
+			/>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />
 			<YearAnalytics
