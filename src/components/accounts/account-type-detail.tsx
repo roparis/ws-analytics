@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { AccountCard } from "@/components/accounts/account-card";
 import { ActivitiesTable } from "@/components/activities-table";
-import { ActivityChart } from "@/components/charts/activity-chart";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import { YearBreakdownChart } from "@/components/charts/year-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
@@ -116,7 +115,6 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 			<YearBreakdownChart activities={scoped} currency={currency} />
 
 			<MoneyFlow activities={scoped} currency={currency} />
-			<ActivityChart activities={scoped} currency={currency} />
 			<ActivitiesTable activities={scoped} currency={currency} />
 		</main>
 	);

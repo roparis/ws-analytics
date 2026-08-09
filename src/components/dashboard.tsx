@@ -6,7 +6,6 @@ import {
 	type Earned,
 } from "@/components/accounts/account-group-list";
 import { ActivitiesTable } from "@/components/activities-table";
-import { ActivityChart } from "@/components/charts/activity-chart";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import {
 	DashboardFilters,
@@ -155,7 +154,6 @@ export function Dashboard() {
 					kpis={kpis}
 				/>
 				<MoneyFlow activities={filtered} currency={currency} />
-				{/* <ActivityChart activities={filtered} currency={currency} /> */}
 				<ActivitiesTable activities={filtered} currency={currency} />
 			</div>
 		</div>
