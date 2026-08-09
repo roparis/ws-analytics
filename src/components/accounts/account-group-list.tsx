@@ -1,10 +1,15 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Amount } from "@/components/ui/figures";
-import { formatDate, groupByAccount } from "@/lib/metrics";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { formatCurrency, formatDate, groupByAccount } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/lib/wealthsimple";
 
@@ -31,26 +36,54 @@ interface AccountGroupListProps {
 	 * object already has, and TypeScript resolves the prop against the built-in.
 	 */
 	amountFor?: (accountId: string) => number;
-	/**
-	 * Money put into the account from outside it — your bank *and* your other
-	 * Wealthsimple accounts — net of anything moved back out. Signed: negative
-	 * means more left than arrived.
-	 *
-	 * Counting only bank withdrawals was misleading: an account funded by a
-	 * transfer from another account looked like it had been drained. Every
-	 * movement across the account's boundary counts here, whichever side it
-	 * came from.
-	 *
-	 * Shown beside the value rather than subtracted from it — the two answer
-	 * different questions, and the gap between them is what the holdings earned.
-	 */
-	fundedFor?: (accountId: string) => number;
+	/** What the account made on top of the money put in. */
+	earnedFor?: (accountId: string) => Earned;
+}
+
+/**
+ * Everything an account gained that didn't come out of your pocket.
+ *
+ * Reconciles exactly against `(book cost + cash) − money added` on every
+ * account in a real export, which is the check that keeps the breakdown honest:
+ * the parts have to add up to the gap they claim to explain.
+ */
+export interface Earned {
+	/** Sum of the parts below. */
+	total: number;
+	/** Proceeds less the cost released, on positions actually sold. */
+	realized: number;
+	dividends: number;
+	interest: number;
+	/** Cash back, referrals and giveaways. */
+	bonuses: number;
+	/** Fees, margin interest and withholding tax. Positive; subtracted. */
+	feesAndTax: number;
+}
+
+export const NO_EARNINGS: Earned = {
+	total: 0,
+	realized: 0,
+	dividends: 0,
+	interest: 0,
+	bonuses: 0,
+	feesAndTax: 0,
+};
+
+function addEarned(a: Earned, b: Earned): Earned {
+	return {
+		total: a.total + b.total,
+		realized: a.realized + b.realized,
+		dividends: a.dividends + b.dividends,
+		interest: a.interest + b.interest,
+		bonuses: a.bonuses + b.bonuses,
+		feesAndTax: a.feesAndTax + b.feesAndTax,
+	};
 }
 
 interface AccountRow {
 	id: string;
 	total: number;
-	funded: number;
+	earned: Earned;
 	count: number;
 	last: string;
 }
@@ -59,19 +92,64 @@ interface TypeGroup {
 	accountType: string;
 	accounts: AccountRow[];
 	total: number;
-	funded: number;
+	earned: Earned;
 }
 
 /**
- * The money-in line under a value. Reads as "added" or "taken out" depending on
- * which way it went, so the sign never has to be decoded from a minus sign.
+ * The earnings line under the amount added, with its composition on hover.
+ *
+ * The breakdown is the point: "earned" on its own invites the reading "my
+ * holdings went up", which would be wrong — none of this is price movement,
+ * because the export has no prices. It is realised sales, distributions and
+ * rewards, less what the account was charged.
  */
-function FundedNote({ currency, value }: { currency: string; value: number }) {
-	if (Math.abs(value) < 0.005) return null;
+function EarnedNote({
+	currency,
+	earned,
+}: {
+	currency: string;
+	earned: Earned;
+}) {
+	if (Math.abs(earned.total) < 0.005) return null;
+
+	const parts: [string, number][] = [
+		["Realised gains", earned.realized],
+		["Dividends", earned.dividends],
+		["Interest", earned.interest],
+		["Cash back & bonuses", earned.bonuses],
+		["Fees & tax", -earned.feesAndTax],
+	];
+
 	return (
-		<span className="text-muted-foreground text-xs">
-			<Amount currency={currency} value={Math.abs(value)} />{" "}
-			{value > 0 ? "added" : "taken out"}
+		<span className="flex items-center gap-1 text-muted-foreground text-xs">
+			<Amount currency={currency} value={earned.total} />
+			{earned.total > 0 ? "earned" : "lost"}
+			<Tooltip>
+				<TooltipTrigger
+					aria-label="What this is made of"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					<Info className="size-3" />
+				</TooltipTrigger>
+				<TooltipContent className="max-w-xs">
+					<span className="flex flex-col gap-1">
+						<span>
+							On top of the money put in — none of it price movement, which your
+							export doesn&apos;t contain.
+						</span>
+						{parts
+							.filter(([, value]) => Math.abs(value) >= 0.005)
+							.map(([label, value]) => (
+								<span className="flex justify-between gap-4" key={label}>
+									<span>{label}</span>
+									<span className="tabular-nums">
+										{formatCurrency(value, currency)}
+									</span>
+								</span>
+							))}
+					</span>
+				</TooltipContent>
+			</Tooltip>
 		</span>
 	);
 }
@@ -81,7 +159,7 @@ export function AccountGroupList({
 	currency,
 	caption,
 	amountFor,
-	fundedFor,
+	earnedFor,
 }: AccountGroupListProps) {
 	const groups = useMemo<TypeGroup[]>(() => {
 		const byType = new Map<string, TypeGroup>();
@@ -91,7 +169,7 @@ export function AccountGroupList({
 				? amountFor(account.id)
 				: account.kpis.netCashFlow;
 
-			const funded = fundedFor?.(account.id) ?? 0;
+			const earned = earnedFor?.(account.id) ?? NO_EARNINGS;
 
 			let group = byType.get(account.accountType);
 			if (!group) {
@@ -99,19 +177,19 @@ export function AccountGroupList({
 					accountType: account.accountType,
 					accounts: [],
 					total: 0,
-					funded: 0,
+					earned: NO_EARNINGS,
 				};
 				byType.set(account.accountType, group);
 			}
 			group.accounts.push({
 				id: account.id,
 				total,
-				funded,
+				earned,
 				count: account.kpis.count,
 				last: account.kpis.dateRange.end,
 			});
 			group.total += total;
-			group.funded += funded;
+			group.earned = addEarned(group.earned, earned);
 		}
 
 		return [...byType.values()]
@@ -120,7 +198,7 @@ export function AccountGroupList({
 				accounts: group.accounts.sort((a, b) => b.total - a.total),
 			}))
 			.sort((a, b) => b.total - a.total);
-	}, [activities, amountFor, fundedFor]);
+	}, [activities, amountFor, earnedFor]);
 
 	const [open, setOpen] = useState<string[]>([]);
 
@@ -167,8 +245,8 @@ export function AccountGroupList({
 										currency={currency}
 										value={group.total}
 									/>
-									{fundedFor && (
-										<FundedNote currency={currency} value={group.funded} />
+									{earnedFor && (
+										<EarnedNote currency={currency} earned={group.earned} />
 									)}
 								</span>
 
@@ -215,10 +293,10 @@ export function AccountGroupList({
 											</span>
 											<span className="flex flex-col items-end">
 												<Amount currency={currency} value={account.total} />
-												{fundedFor && (
-													<FundedNote
+												{earnedFor && (
+													<EarnedNote
 														currency={currency}
-														value={account.funded}
+														earned={account.earned}
 													/>
 												)}
 											</span>

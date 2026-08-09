@@ -2,7 +2,10 @@
 
 import { Trash2 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { AccountGroupList } from "@/components/accounts/account-group-list";
+import {
+	AccountGroupList,
+	type Earned,
+} from "@/components/accounts/account-group-list";
 import { ActivitiesTable } from "@/components/activities-table";
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { CapitalChart } from "@/components/charts/capital-chart";
@@ -45,9 +48,6 @@ export function Dashboard() {
 
 	const kpis = useMemo(() => computeKpis(filtered), [filtered]);
 
-	// What each account holds, at what it cost, plus whatever cash sits in it. A
-	// brokerage would show market value here; the export has no prices, so this
-	// is the closest figure the file actually supports.
 	const report = useMemo(
 		() =>
 			dataset
@@ -55,21 +55,10 @@ export function Dashboard() {
 				: null,
 		[dataset],
 	);
-	const heldAtCost = useCallback(
-		(accountId: string) => {
-			const account = report?.byAccount.find(
-				(candidate) => candidate.accountId === accountId,
-			);
-			return account ? account.bookCost + account.cashBalance : 0;
-		},
-		[report],
-	);
-
 	// Every cash movement across the account's boundary, netted — deposits from
-	// your bank and transfers from your other Wealthsimple accounts alike. The
-	// counterparty doesn't change the fact that the money arrived, and counting
-	// only the bank side made a transfer-funded account look drained.
-	const fundedFor = useCallback(
+	// your bank and transfers from your other Wealthsimple accounts alike. This
+	// is your own money, which is the figure the row leads with.
+	const addedTo = useCallback(
 		(accountId: string) => {
 			if (!dataset) return 0;
 			return computeKpis(
@@ -80,6 +69,49 @@ export function Dashboard() {
 			).netDeposits;
 		},
 		[dataset],
+	);
+
+	// What the account made on top of that. Built from its parts rather than as
+	// `value − added`, so the tooltip's breakdown is the figure itself and can't
+	// drift from it — the two agree to the cent on every account in a real export.
+	const earnedIn = useCallback(
+		(accountId: string): Earned => {
+			const account = report?.byAccount.find(
+				(candidate) => candidate.accountId === accountId,
+			);
+			if (!account || !dataset) {
+				return {
+					total: 0,
+					realized: 0,
+					dividends: 0,
+					interest: 0,
+					bonuses: 0,
+					feesAndTax: 0,
+				};
+			}
+			const kpis = computeKpis(
+				filterActivities(dataset.activities, {
+					...EMPTY_FILTERS,
+					accountIds: [accountId],
+				}),
+			);
+			const bonuses = kpis.cashback + kpis.promo;
+			const feesAndTax = account.fees + account.withholdingTax;
+			return {
+				total:
+					account.realizedPnl +
+					account.dividends +
+					account.interest +
+					bonuses -
+					feesAndTax,
+				realized: account.realizedPnl,
+				dividends: account.dividends,
+				interest: account.interest,
+				bonuses,
+				feesAndTax,
+			};
+		},
+		[dataset, report],
 	);
 
 	if (!dataset) return null;
@@ -124,10 +156,10 @@ export function Dashboard() {
 
 				<AccountGroupList
 					activities={dataset.activities}
-					amountFor={heldAtCost}
-					caption="Holdings at what you paid for them, plus uninvested cash. Underneath, the money you put in — from your bank or from your other accounts, net of anything moved back out. The gap between the two is what the holdings earned."
+					amountFor={addedTo}
+					caption="The money you put in — from your bank or from your other accounts, net of anything moved back out. Underneath, what the account made on top of it."
 					currency={currency}
-					fundedFor={fundedFor}
+					earnedFor={earnedIn}
 				/>
 
 				<SourcesPanel sources={dataset.sources} />
