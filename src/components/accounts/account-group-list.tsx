@@ -32,19 +32,25 @@ interface AccountGroupListProps {
 	 */
 	amountFor?: (accountId: string) => number;
 	/**
-	 * Cash taken out of the account, as a positive magnitude. Shown beside the
-	 * value rather than subtracted from it: an account can hold a large position
-	 * *and* have had a lot withdrawn, because deposits, dividends and recycled
-	 * sale proceeds all funded it over time. Netting the two would produce a
-	 * figure that is neither what you hold nor what you put in.
+	 * Money put into the account from outside it — your bank *and* your other
+	 * Wealthsimple accounts — net of anything moved back out. Signed: negative
+	 * means more left than arrived.
+	 *
+	 * Counting only bank withdrawals was misleading: an account funded by a
+	 * transfer from another account looked like it had been drained. Every
+	 * movement across the account's boundary counts here, whichever side it
+	 * came from.
+	 *
+	 * Shown beside the value rather than subtracted from it — the two answer
+	 * different questions, and the gap between them is what the holdings earned.
 	 */
-	withdrawnFor?: (accountId: string) => number;
+	fundedFor?: (accountId: string) => number;
 }
 
 interface AccountRow {
 	id: string;
 	total: number;
-	withdrawn: number;
+	funded: number;
 	count: number;
 	last: string;
 }
@@ -53,7 +59,21 @@ interface TypeGroup {
 	accountType: string;
 	accounts: AccountRow[];
 	total: number;
-	withdrawn: number;
+	funded: number;
+}
+
+/**
+ * The money-in line under a value. Reads as "added" or "taken out" depending on
+ * which way it went, so the sign never has to be decoded from a minus sign.
+ */
+function FundedNote({ currency, value }: { currency: string; value: number }) {
+	if (Math.abs(value) < 0.005) return null;
+	return (
+		<span className="text-muted-foreground text-xs">
+			<Amount currency={currency} value={Math.abs(value)} />{" "}
+			{value > 0 ? "added" : "taken out"}
+		</span>
+	);
 }
 
 export function AccountGroupList({
@@ -61,7 +81,7 @@ export function AccountGroupList({
 	currency,
 	caption,
 	amountFor,
-	withdrawnFor,
+	fundedFor,
 }: AccountGroupListProps) {
 	const groups = useMemo<TypeGroup[]>(() => {
 		const byType = new Map<string, TypeGroup>();
@@ -71,7 +91,7 @@ export function AccountGroupList({
 				? amountFor(account.id)
 				: account.kpis.netCashFlow;
 
-			const withdrawn = withdrawnFor?.(account.id) ?? 0;
+			const funded = fundedFor?.(account.id) ?? 0;
 
 			let group = byType.get(account.accountType);
 			if (!group) {
@@ -79,19 +99,19 @@ export function AccountGroupList({
 					accountType: account.accountType,
 					accounts: [],
 					total: 0,
-					withdrawn: 0,
+					funded: 0,
 				};
 				byType.set(account.accountType, group);
 			}
 			group.accounts.push({
 				id: account.id,
 				total,
-				withdrawn,
+				funded,
 				count: account.kpis.count,
 				last: account.kpis.dateRange.end,
 			});
 			group.total += total;
-			group.withdrawn += withdrawn;
+			group.funded += funded;
 		}
 
 		return [...byType.values()]
@@ -100,7 +120,7 @@ export function AccountGroupList({
 				accounts: group.accounts.sort((a, b) => b.total - a.total),
 			}))
 			.sort((a, b) => b.total - a.total);
-	}, [activities, amountFor, withdrawnFor]);
+	}, [activities, amountFor, fundedFor]);
 
 	const [open, setOpen] = useState<string[]>([]);
 
@@ -147,11 +167,8 @@ export function AccountGroupList({
 										currency={currency}
 										value={group.total}
 									/>
-									{group.withdrawn > 0 && (
-										<span className="text-muted-foreground text-xs">
-											<Amount currency={currency} value={group.withdrawn} />{" "}
-											withdrawn
-										</span>
+									{fundedFor && (
+										<FundedNote currency={currency} value={group.funded} />
 									)}
 								</span>
 
@@ -198,14 +215,11 @@ export function AccountGroupList({
 											</span>
 											<span className="flex flex-col items-end">
 												<Amount currency={currency} value={account.total} />
-												{account.withdrawn > 0 && (
-													<span className="text-muted-foreground text-xs">
-														<Amount
-															currency={currency}
-															value={account.withdrawn}
-														/>{" "}
-														withdrawn
-													</span>
+												{fundedFor && (
+													<FundedNote
+														currency={currency}
+														value={account.funded}
+													/>
 												)}
 											</span>
 										</Link>
