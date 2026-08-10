@@ -135,6 +135,19 @@ Three things to know about the numbers:
 - **A holding Yahoo can't chart is held at book cost** for those years and
   named in the tooltip — the same rule the live snapshot follows.
 
+One trap is worth writing down, because it cost a real bug. Yahoo stamps a
+monthly bar at **midnight on the first, in the exchange's own timezone**, and
+hands it over as an instant. `USDCAD=X` trades on `Europe/London`, so during
+British Summer Time its bars arrive as `2022-09-30T23:00:00Z` — October, an
+hour before UTC agrees. Reading the month off `toISOString()` filed October's
+rate under September, September's under August, and so on for every BST month,
+with only the last of the run going visibly missing. Nothing looked broken:
+five months of rates were simply one month early. December is on GMT, which is
+why the year-end conversions the page actually leans on came out right anyway.
+
+[src/lib/market-month.ts](../src/lib/market-month.ts) reads the month in the
+timezone the chart's own metadata reports, so there is nothing left to infer.
+
 `valueYears` rebuilds positions once per year, which is a walk of the whole
 activity history per year. At the reference dataset's 2,947 rows over five
 years that is imperceptible; a twenty-year export would want the walk to emit
