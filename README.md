@@ -2,7 +2,9 @@
 
 A lightweight open-source browser app for exploring Wealthsimple CSV data with charts, tables, and PDF export.
 
-This repository contains the self-hosted core: everything runs in the browser with no backend, no external database, and no data leaving your machine.
+This repository contains the self-hosted core: your data is parsed and analysed in the browser, with no external database and no file ever uploaded.
+
+> **On this branch (`WSA-006`)** there is one exception, and it is a proof of concept: live pricing sends *ticker symbols* — never share counts, amounts, or accounts — through this app's own server to Yahoo Finance. See [docs/yahoo-pricing-poc.md](docs/yahoo-pricing-poc.md). Without it, the app still has no backend at all.
 
 ## Quick start
 
@@ -23,6 +25,7 @@ Then open [http://localhost:3000](http://localhost:3000) and upload a `.csv` fil
 - Sortable, paginated data table
 - Auto-generated chart visualization with column selectors
 - Export the current view as a PDF report
+- Live holding prices from Yahoo Finance, or from a Google Sheets round trip
 - Dark/light theme support
 
 ## How it works
