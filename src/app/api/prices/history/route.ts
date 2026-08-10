@@ -7,6 +7,7 @@ import {
 	type PriceHistorySeries,
 	type PriceRequestSymbol,
 } from "@/lib/live-prices";
+import { marketMonth } from "@/lib/market-month";
 import { USD_CAD_TICKER } from "@/lib/yahoo-ticker";
 
 /**
@@ -155,10 +156,18 @@ async function monthlyCloses(
 			period2: to,
 		});
 
+		// The exchange's own timezone, straight from the response that carried the
+		// bars — see `marketMonth` for why reading them in UTC silently shifts a
+		// London-quoted series by a month for half the year.
+		const timeZone =
+			typeof chart.meta.exchangeTimezoneName === "string"
+				? chart.meta.exchangeTimezoneName
+				: null;
+
 		const closes: Record<string, number> = {};
 		for (const bar of chart.quotes) {
 			if (bar.close === null || !Number.isFinite(bar.close)) continue;
-			closes[monthKey(bar.date)] = bar.close;
+			closes[marketMonth(bar.date, timeZone)] = bar.close;
 		}
 
 		if (Object.keys(closes).length === 0) {
@@ -178,25 +187,6 @@ async function monthlyCloses(
 			}`,
 		};
 	}
-}
-
-/**
- * The month a bar belongs to.
- *
- * A monthly bar is stamped when its month opens **in the exchange's own
- * timezone**, which for a market east of UTC is the last evening of the month
- * before: Yahoo's October `USDCAD=X` bar arrives as `2022-09-30T23:00:00Z`.
- * Reading `toISOString()` straight off filed every October under September —
- * silently overwriting the real September close and leaving October absent
- * from the whole series.
- *
- * Nudging two days forward before reading the month lands both stampings in
- * the month they mean, and can't reach the next one: a bar is never stamped
- * more than a day off its boundary.
- */
-function monthKey(date: Date): string {
-	const nudged = new Date(date.getTime() + 2 * 86_400_000);
-	return nudged.toISOString().slice(0, 7);
 }
 
 function readRequest(body: unknown): {
