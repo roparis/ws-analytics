@@ -37,7 +37,10 @@ export function Segmented<T extends string>({
 		<div
 			aria-label={props["aria-label"]}
 			className={cn(
-				"flex items-center gap-0.5",
+				// Wraps rather than overflows: the measure toggle grows by two when a
+				// price history is loaded, and a seventh pill should drop to a second
+				// line instead of running off the card.
+				"flex flex-wrap items-center gap-0.5",
 				inset && "rounded-full bg-muted p-0.5",
 				className,
 			)}

@@ -1,4 +1,5 @@
 import type { SourceFile } from "@/lib/merge";
+import type { PriceHistory } from "@/lib/price-history";
 import type { PriceSnapshot } from "@/lib/price-snapshot";
 import {
 	type Activity,
@@ -20,6 +21,8 @@ const META = "meta";
 const PRICES = "prices";
 const ORDER_KEY = "order";
 const SNAPSHOT_KEY = "snapshot";
+/** Shares the `prices` store with the snapshot — same lifetime, same wipe. */
+const HISTORY_KEY = "history";
 
 interface StoredSource {
 	fileName: string;
@@ -251,6 +254,44 @@ export async function savePriceSnapshot(
 			tx.objectStore(PRICES).put({ key: SNAPSHOT_KEY, snapshot });
 		} else {
 			tx.objectStore(PRICES).delete(SNAPSHOT_KEY);
+		}
+		await done(tx);
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * The stored monthly price history, or null if none has been fetched.
+ *
+ * Kept beside the snapshot rather than inside it: a snapshot is replaced every
+ * time someone refreshes a quote, while the history behind it barely moves —
+ * last year's December close is settled. Rewriting several hundred kilobytes of
+ * closes on every quote refresh would be pure waste.
+ */
+export async function loadPriceHistory(): Promise<PriceHistory | null> {
+	const db = await openDb();
+	try {
+		const tx = db.transaction(PRICES, "readonly");
+		const stored = await readValue<{ key: string; history: PriceHistory }>(
+			tx.objectStore(PRICES).get(HISTORY_KEY),
+		);
+		return stored?.history ?? null;
+	} finally {
+		db.close();
+	}
+}
+
+export async function savePriceHistory(
+	history: PriceHistory | null,
+): Promise<void> {
+	const db = await openDb();
+	try {
+		const tx = db.transaction(PRICES, "readwrite");
+		if (history) {
+			tx.objectStore(PRICES).put({ key: HISTORY_KEY, history });
+		} else {
+			tx.objectStore(PRICES).delete(HISTORY_KEY);
 		}
 		await done(tx);
 	} finally {

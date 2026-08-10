@@ -65,6 +65,38 @@ export interface LivePriceErrorBody {
 }
 
 /**
+ * The second call: monthly closes, far enough back to cover the whole export.
+ *
+ * A quote answers "what is this worth now"; the analytics page asks "what was
+ * this worth at the end of 2023", which no single quote can answer. Yahoo's
+ * chart endpoint takes one symbol at a time, so this is N requests where the
+ * quote route is one — the reason the two are separate routes rather than one
+ * call that always pays for both.
+ */
+export interface PriceHistoryRequest {
+	symbols: PriceRequestSymbol[];
+	/** `YYYY-MM-DD`, the first day the export covers. */
+	from: string;
+	/** `YYYY-MM-DD`, the last day it covers. */
+	to: string;
+}
+
+export interface PriceHistorySeries extends PriceRequestSymbol {
+	/** The currency Yahoo quoted the instrument in, before conversion. */
+	currency: string;
+	/** `YYYY-MM` -> that month's closing price per share, in CAD. */
+	monthlyCad: Record<string, number>;
+}
+
+export interface PriceHistoryResponse {
+	fetchedAt: string;
+	series: PriceHistorySeries[];
+	misses: LivePriceMiss[];
+	/** `YYYY-MM` -> USD→CAD at that month's close. Empty when nothing was USD. */
+	usdCadByMonth: Record<string, number>;
+}
+
+/**
  * The most symbols one request may carry.
  *
  * Yahoo takes a comma-separated list and answers in one round trip, so the cap
@@ -76,6 +108,9 @@ export const MAX_SYMBOLS = 100;
 
 /** Where the browser sends its list. */
 export const PRICES_ENDPOINT = "/api/prices";
+
+/** And where it asks for the same list's past. */
+export const HISTORY_ENDPOINT = "/api/prices/history";
 
 /**
  * Folds a response into the same `PriceSnapshot` the Sheets import produces.
@@ -128,19 +163,48 @@ export class LivePriceError extends Error {}
 export async function fetchLivePrices(
 	symbols: PriceRequestSymbol[],
 ): Promise<LivePriceResponse> {
+	guard(symbols);
+	return post<LivePriceResponse>(PRICES_ENDPOINT, {
+		symbols,
+	} satisfies LivePriceRequest);
+}
+
+/**
+ * Asks the route for the same symbols' monthly closes over a period.
+ *
+ * Slower than the quote by an order of magnitude — one Yahoo request per symbol
+ * — so callers should treat it as the optional half and let a page work without
+ * it, the way the analytics page falls back to book cost.
+ */
+export async function fetchPriceHistory(
+	symbols: PriceRequestSymbol[],
+	from: string,
+	to: string,
+): Promise<PriceHistoryResponse> {
+	guard(symbols);
+	return post<PriceHistoryResponse>(HISTORY_ENDPOINT, {
+		from,
+		symbols,
+		to,
+	} satisfies PriceHistoryRequest);
+}
+
+function guard(symbols: PriceRequestSymbol[]): void {
 	if (symbols.length === 0) {
 		throw new LivePriceError("There are no holdings to price.");
 	}
 	if (symbols.length > MAX_SYMBOLS) {
 		throw new LivePriceError(
-			`That's ${symbols.length} symbols; this route quotes at most ${MAX_SYMBOLS} at a time.`,
+			`That's ${symbols.length} symbols; these routes price at most ${MAX_SYMBOLS} at a time.`,
 		);
 	}
+}
 
+async function post<T>(endpoint: string, body: unknown): Promise<T> {
 	let response: Response;
 	try {
-		response = await fetch(PRICES_ENDPOINT, {
-			body: JSON.stringify({ symbols } satisfies LivePriceRequest),
+		response = await fetch(endpoint, {
+			body: JSON.stringify(body),
 			headers: { "content-type": "application/json" },
 			method: "POST",
 		});
@@ -150,15 +214,15 @@ export async function fetchLivePrices(
 		);
 	}
 
-	const body: unknown = await response.json().catch(() => null);
+	const parsed: unknown = await response.json().catch(() => null);
 
 	if (!response.ok) {
 		const message =
-			body && typeof body === "object" && "error" in body
-				? String((body as LivePriceErrorBody).error)
+			parsed && typeof parsed === "object" && "error" in parsed
+				? String((parsed as LivePriceErrorBody).error)
 				: `The price route answered ${response.status}.`;
 		throw new LivePriceError(message);
 	}
 
-	return body as LivePriceResponse;
+	return parsed as T;
 }

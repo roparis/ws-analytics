@@ -16,8 +16,9 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ALL_ACCOUNT_TYPES, type YearAccountStat } from "@/lib/analytics";
-import { formatCurrency } from "@/lib/metrics";
+import { ALL_ACCOUNT_TYPES } from "@/lib/analytics";
+import { formatCurrency, formatDate } from "@/lib/metrics";
+import type { ValuedYearStat } from "@/lib/price-history";
 
 /**
  * Every figure for a year, one row at a time — the wide view the matrix can't
@@ -36,8 +37,8 @@ const SCOPES = [
 type Scope = (typeof SCOPES)[number]["value"];
 
 interface YearAccountDetailProps {
-	stats: YearAccountStat[];
-	totals: YearAccountStat[];
+	stats: ValuedYearStat[];
+	totals: ValuedYearStat[];
 	currency: string;
 }
 
@@ -48,14 +49,15 @@ export function YearAccountDetail({
 }: YearAccountDetailProps) {
 	const [scope, setScope] = useState<Scope>("year");
 	const rows = scope === "year" ? totals : stats;
+	const priced = totals.some((row) => row.valuation !== null);
 
-	const columns = useMemo<DataTableColumn<YearAccountStat>[]>(() => {
+	const columns = useMemo<DataTableColumn<ValuedYearStat>[]>(() => {
 		const money = (
 			key: string,
 			header: string,
-			pick: (row: YearAccountStat) => number,
+			pick: (row: ValuedYearStat) => number,
 			className?: string,
-		): DataTableColumn<YearAccountStat> => ({
+		): DataTableColumn<ValuedYearStat> => ({
 			key,
 			header,
 			align: "right",
@@ -64,7 +66,7 @@ export function YearAccountDetail({
 			cell: (row) => formatCurrency(pick(row), currency),
 		});
 
-		const leading: DataTableColumn<YearAccountStat>[] = [
+		const leading: DataTableColumn<ValuedYearStat>[] = [
 			{
 				key: "year",
 				header: "Year",
@@ -135,7 +137,7 @@ export function YearAccountDetail({
 				header: "Earned",
 				align: "right",
 				sortValue: (row) => row.earned.total,
-				className: "font-medium tabular-nums",
+				className: priced ? "tabular-nums" : "font-medium tabular-nums",
 				cell: (row) => (
 					<Tooltip>
 						<TooltipTrigger className="cursor-default">
@@ -151,8 +153,75 @@ export function YearAccountDetail({
 					</Tooltip>
 				),
 			},
+			// The priced columns sit to the right of the cash ones, in the order a
+			// reader builds the figure: what it was worth, what moved on paper, and
+			// the two added together.
+			...(priced
+				? [
+						{
+							key: "value",
+							header: "Value at year end",
+							align: "right" as const,
+							sortValue: (row: ValuedYearStat) => row.valuation?.value ?? null,
+							className: "tabular-nums",
+							cell: (row: ValuedYearStat) =>
+								row.valuation ? (
+									<Tooltip>
+										<TooltipTrigger className="cursor-default">
+											{formatCurrency(row.valuation.value, currency)}
+										</TooltipTrigger>
+										<TooltipContent className="max-w-xs">
+											Holdings and cash as they stood on{" "}
+											{formatDate(row.valuation.asOf)}, at that month's closing
+											prices.
+											{row.valuation.missingSymbols.length > 0 &&
+												` No price that year for ${row.valuation.missingSymbols.join(", ")}, so ${row.valuation.missingSymbols.length === 1 ? "it is" : "they are"} counted at what you paid.`}
+										</TooltipContent>
+									</Tooltip>
+								) : (
+									"—"
+								),
+						},
+						{
+							key: "unrealisedChange",
+							header: "Unrealised change",
+							align: "right" as const,
+							sortValue: (row: ValuedYearStat) =>
+								row.valuation?.unrealisedChange ?? null,
+							className: "tabular-nums",
+							cell: (row: ValuedYearStat) =>
+								row.valuation ? (
+									<Tooltip>
+										<TooltipTrigger className="cursor-default">
+											{formatCurrency(row.valuation.unrealisedChange, currency)}
+										</TooltipTrigger>
+										<TooltipContent className="max-w-xs">
+											How the paper gain on holdings you didn't sell moved over
+											the year —{" "}
+											{formatCurrency(row.valuation.unrealised, currency)}{" "}
+											carried at the end of it. Nothing here was cash in your
+											pocket.
+										</TooltipContent>
+									</Tooltip>
+								) : (
+									"—"
+								),
+						},
+						{
+							key: "totalReturn",
+							header: "Total return",
+							align: "right" as const,
+							sortValue: (row: ValuedYearStat) => row.totalReturn,
+							className: "font-medium tabular-nums",
+							cell: (row: ValuedYearStat) =>
+								row.totalReturn === null
+									? "—"
+									: formatCurrency(row.totalReturn, currency),
+						},
+					]
+				: []),
 		];
-	}, [currency, scope]);
+	}, [currency, priced, scope]);
 
 	if (rows.length === 0) return null;
 
@@ -164,8 +233,10 @@ export function YearAccountDetail({
 						<CardTitle>What each year did</CardTitle>
 						<CardDescription>
 							Medians run over every month your files cover, counting the months
-							you put nothing in. "Earned" leaves out holdings you still own —
-							without prices, an unrealised gain isn't knowable.
+							you put nothing in.{" "}
+							{priced
+								? '"Earned" is what the year paid out in cash; "Total return" adds what your unsold holdings did on paper.'
+								: '"Earned" leaves out holdings you still own — without prices, an unrealised gain isn\'t knowable.'}
 						</CardDescription>
 					</div>
 					<Segmented
