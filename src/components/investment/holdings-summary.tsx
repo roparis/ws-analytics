@@ -8,6 +8,7 @@ import type { PositionsReport } from "@/lib/positions";
 import {
 	STALE_AFTER_DAYS,
 	snapshotAgeDays,
+	sourceLabel,
 	valueWith,
 } from "@/lib/price-snapshot";
 import { usePriceStore } from "@/stores/prices";
@@ -38,7 +39,7 @@ export function HoldingsSummary({ report, currency }: HoldingsSummaryProps) {
 			? {
 					label: "Market value",
 					value: formatCurrency(marketValue, currency),
-					hint: `The ${valued.pricedCount} of ${valued.holdingCount} ${valued.holdingCount === 1 ? "holding" : "holdings"} your imported sheet could price, at ${formatDate(snapshot?.asOf ?? "")} prices.`,
+					hint: `The ${valued.pricedCount} of ${valued.holdingCount} ${valued.holdingCount === 1 ? "holding" : "holdings"} ${snapshot ? sourceLabel(snapshot) : "your prices"} could price, at ${formatDate(snapshot?.asOf ?? "")} prices.`,
 				}
 			: {
 					label: "Book cost of holdings",
@@ -96,7 +97,7 @@ export function HoldingsSummary({ report, currency }: HoldingsSummaryProps) {
 						/>
 					)}
 					<span>
-						· Prices from your imported sheet,{" "}
+						· Prices from {snapshot ? sourceLabel(snapshot) : "your import"},{" "}
 						{formatDate(snapshot?.asOf ?? "")}
 						{snapshot && snapshotAgeDays(snapshot) > STALE_AFTER_DAYS
 							? " — old enough that markets have moved since."
@@ -111,8 +112,9 @@ export function HoldingsSummary({ report, currency }: HoldingsSummaryProps) {
 					Wealthsimple activities export contains no prices and no position
 					snapshot, so anything shown here as &ldquo;what it&apos;s worth
 					today&rdquo; would be invented. Everything above is reconstructed from
-					your own transactions. Export to Google Sheets, let it fetch prices,
-					then import that tab back to see what these holdings are worth.
+					your own transactions. Fetch live prices to value them against Yahoo
+					Finance, or export to Google Sheets, let it fetch prices, and import
+					that tab back.
 				</p>
 			)}
 		</div>

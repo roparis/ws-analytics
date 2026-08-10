@@ -29,10 +29,23 @@ const COLUMNS = {
 	account: "Account",
 } as const;
 
+/**
+ * Where a snapshot's prices came from. Two doors into the same room: the sheet
+ * round trip below, and the live quotes in `live-prices.ts`. Everything
+ * downstream — valuation, staleness, storage — treats them identically, and
+ * only the copy that names the source has to know the difference.
+ */
+export type PriceSource = "sheet" | "yahoo";
+
 export interface PriceSnapshot {
 	/** When the prices were read, as `YYYY-MM-DD`. */
 	asOf: string;
-	fileName: string;
+	/** Absent in snapshots stored before live quotes existed — read as `sheet`. */
+	source?: PriceSource;
+	/** The downloaded tab, when the prices came from one. */
+	fileName?: string;
+	/** ISO instant of the newest quote, when the source can say. */
+	quotedAt?: string;
 	/** Symbol -> price per share in CAD. */
 	pricesCad: Record<string, number>;
 	/** Symbols the file priced. */
@@ -101,6 +114,7 @@ export function parsePriceCsv(
 
 	return {
 		asOf,
+		source: "sheet",
 		fileName,
 		pricesCad,
 		matched,
@@ -231,3 +245,14 @@ export function snapshotAgeDays(
 
 /** Past this, the prices are old enough that the UI should say so. */
 export const STALE_AFTER_DAYS = 7;
+
+/**
+ * How to name a snapshot's source in a sentence.
+ *
+ * Worth saying rather than assuming: "what you paid" and "what Yahoo said at
+ * 4pm" are different claims, and a reader deciding something with these numbers
+ * should know which one they're reading.
+ */
+export function sourceLabel(snapshot: PriceSnapshot): string {
+	return snapshot.source === "yahoo" ? "Yahoo Finance" : "your imported sheet";
+}
