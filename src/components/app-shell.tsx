@@ -1,6 +1,11 @@
 "use client";
 
-import { ChartCandlestick, Home, LayoutDashboard } from "lucide-react";
+import {
+	ChartCandlestick,
+	Home,
+	LayoutDashboard,
+	TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -16,6 +21,7 @@ const NAV = [
 	{ href: "/", label: "Timeline", Icon: Home },
 	{ href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
 	{ href: "/investment", label: "Investments", Icon: ChartCandlestick },
+	{ href: "/analytics", label: "Analytics", Icon: TrendingUp },
 ] as const;
 
 // A stable empty-array fallback: returning `[]` inline from a selector would

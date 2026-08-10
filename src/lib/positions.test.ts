@@ -573,6 +573,89 @@ describe("account figures", () => {
 	});
 });
 
+describe("realisations", () => {
+	it("dates each realised gain to the sale that produced it", () => {
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, transactionDate: "2025-03-01", unitPrice: 10 }),
+			trade({ quantity: -4, transactionDate: "2025-09-01", unitPrice: 15 }),
+			trade({ quantity: -6, transactionDate: "2026-04-01", unitPrice: 20 }),
+		]);
+
+		// Cost released at the pool average of $10: 4 shares at $15 realises $20,
+		// then the closing 6 at $20 realises $60.
+		expect(report.realizations).toHaveLength(2);
+		expect(report.realizations[0]).toMatchObject({
+			accountId: "TEST0001CAD",
+			accountType: "TFSA",
+			date: "2025-09-01",
+			symbol: "ZAG",
+		});
+		expect(report.realizations[0].amount).toBeCloseTo(20, 6);
+		expect(report.realizations[1].date).toBe("2026-04-01");
+		expect(report.realizations[1].amount).toBeCloseTo(60, 6);
+	});
+
+	it("sums to the same realised gain the position reports", () => {
+		// The invariant that lets a per-year table trust this log: splitting a
+		// figure by date must not change the figure.
+		const report = buildPositions([
+			funding(5000),
+			trade({ quantity: 10, transactionDate: "2025-03-01", unitPrice: 10 }),
+			trade({ quantity: -4, transactionDate: "2025-09-01", unitPrice: 15 }),
+			trade({ quantity: 5, transactionDate: "2025-11-01", unitPrice: 12 }),
+			trade({ quantity: -11, transactionDate: "2026-04-01", unitPrice: 20 }),
+			trade({
+				quantity: 3,
+				symbol: "VTI",
+				transactionDate: "2026-05-01",
+				unitPrice: 100,
+			}),
+			trade({
+				quantity: -1,
+				symbol: "VTI",
+				transactionDate: "2026-06-01",
+				unitPrice: 130,
+			}),
+		]);
+
+		const logged = report.realizations.reduce(
+			(total, event) => total + event.amount,
+			0,
+		);
+		expect(logged).toBeCloseTo(report.totals.realizedPnl, 6);
+
+		for (const position of report.positions) {
+			const forSymbol = report.realizations
+				.filter((event) => event.symbol === position.symbol)
+				.reduce((total, event) => total + event.amount, 0);
+			expect(forSymbol).toBeCloseTo(position.realizedPnl, 6);
+		}
+	});
+
+	it("logs nothing when nothing has been sold", () => {
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, unitPrice: 10 }),
+		]);
+
+		expect(report.realizations).toEqual([]);
+	});
+
+	it("runs oldest first", () => {
+		const report = buildPositions([
+			funding(5000),
+			trade({ quantity: 10, transactionDate: "2024-01-02", unitPrice: 10 }),
+			trade({ quantity: -2, transactionDate: "2026-05-01", unitPrice: 15 }),
+			trade({ quantity: -2, transactionDate: "2024-06-01", unitPrice: 12 }),
+			trade({ quantity: -2, transactionDate: "2025-02-01", unitPrice: 14 }),
+		]);
+
+		const dates = report.realizations.map((event) => event.date);
+		expect(dates).toEqual([...dates].sort());
+	});
+});
+
 describe("normalizeName", () => {
 	it("collapses non-breaking spaces and trailing whitespace", () => {
 		expect(normalizeName("2U Inc.  ")).toBe("2U Inc.");

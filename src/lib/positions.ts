@@ -167,6 +167,25 @@ export interface PositionsTotals {
 	closedCount: number;
 }
 
+/**
+ * One sale's realised gain, with the date it happened on.
+ *
+ * `Position.realizedPnl` is a lifetime total, which is the right figure for a
+ * holdings table and useless for a per-year one. Rather than have a second
+ * module re-walk the trades to date the same gains — the surest way to end up
+ * with two numbers that disagree — the walk emits its realisations as it makes
+ * them. Summing `amount` over a pool's events equals that pool's `realizedPnl`
+ * exactly, and `positions.test.ts` holds them to it.
+ */
+export interface RealizationEvent {
+	/** `transactionDate` of the sale, or of the last trade for a closing exit. */
+	date: string;
+	accountId: string;
+	accountType: string;
+	symbol: string;
+	amount: number;
+}
+
 export interface PositionsReport {
 	positions: Position[];
 	/** Still held, book cost descending. */
@@ -178,6 +197,8 @@ export interface PositionsReport {
 	bySymbol: SymbolRollup[];
 	byAccount: AccountRollup[];
 	byAccountType: AccountTypeRollup[];
+	/** Every realised gain, dated. Oldest first. */
+	realizations: RealizationEvent[];
 	totals: PositionsTotals;
 	/** Dataset-level problems, same shape as `validateDataset`'s return. */
 	issues: string[];
@@ -249,6 +270,24 @@ interface Pool {
 	tradeCount: number;
 	rows: Activity[];
 	issues: Map<PositionFlag, PositionIssue>;
+	/** Realisations as they happen, so `realizedPnl` can be split by date. */
+	realizations: RealizationEvent[];
+}
+
+/**
+ * Records a realisation against the pool. Exact zeros are dropped — a sale that
+ * broke even is not a per-year figure anyone needs, and keeping them would bulk
+ * the log out with rows that sum to nothing.
+ */
+function realize(pool: Pool, date: string, amount: number): void {
+	if (amount === 0) return;
+	pool.realizations.push({
+		date,
+		accountId: pool.accountId,
+		accountType: pool.accountType,
+		symbol: pool.symbol,
+		amount,
+	});
 }
 
 function flag(pool: Pool, flagName: PositionFlag, message: string): void {
@@ -521,6 +560,7 @@ export function buildPositions(
 			tradeCount: 0,
 			rows: rows.map((row) => row.activity),
 			issues: new Map(),
+			realizations: [],
 		};
 		pools.push(pool);
 
@@ -620,7 +660,9 @@ export function buildPositions(
 			const basisReleased =
 				pool.shares > 0 ? pool.bookCost * (soldShares / pool.shares) : 0;
 
-			pool.realizedPnl += activity.netCashAmount - basisReleased;
+			const realized = activity.netCashAmount - basisReleased;
+			pool.realizedPnl += realized;
+			realize(pool, activity.transactionDate, realized);
 			pool.proceeds += activity.netCashAmount;
 			pool.bookCost = Math.max(0, pool.bookCost - basisReleased);
 			pool.shares += quantity;
@@ -641,12 +683,16 @@ export function buildPositions(
 		// belongs to the final disposition — a full exit realizes all remaining cost.
 		if (Math.abs(pool.shares) < SHARE_EPSILON) {
 			pool.realizedPnl -= pool.bookCost;
+			// Dated to the last trade: this residual belongs to the sale that
+			// closed the position, which is the row that produced it.
+			realize(pool, pool.lastTradeDate ?? "", -pool.bookCost);
 			pool.shares = 0;
 			pool.bookCost = 0;
 		} else if (pool.shares < 0) {
 			// Already flagged as `sold-more-than-held`. Clamp so nothing downstream
 			// renders a negative holding, but keep the issue attached.
 			pool.realizedPnl -= pool.bookCost;
+			realize(pool, pool.lastTradeDate ?? "", -pool.bookCost);
 			pool.shares = 0;
 			pool.bookCost = 0;
 		}
@@ -703,6 +749,13 @@ export function buildPositions(
 				`${account.accountId} (${account.accountType}): ${account.historyReasons.join(" ")}`,
 		);
 
+	const realizations = pools
+		.flatMap((pool) => pool.realizations)
+		.sort(
+			(a, b) =>
+				a.date.localeCompare(b.date) || a.symbol.localeCompare(b.symbol),
+		);
+
 	return {
 		positions,
 		open,
@@ -711,6 +764,7 @@ export function buildPositions(
 		bySymbol,
 		byAccount,
 		byAccountType,
+		realizations,
 		totals: {
 			bookCost: sum(open, (position) => position.bookCost),
 			realizedPnl: sum(positions, (position) => position.realizedPnl),

@@ -6,6 +6,7 @@ import {
 	saveOrder,
 	saveSources,
 } from "@/lib/storage";
+import { usePriceStore } from "@/stores/prices";
 
 interface DatasetState {
 	/** Raw per-file activities, in the order added — earlier files win overlaps. */
@@ -96,5 +97,9 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
 	clear: () => {
 		persist(clearStorage());
 		set({ sources: [], dataset: null });
+		// `clearStorage` already removes the stored prices; this drops the copy
+		// still in memory, so the app doesn't keep valuing a portfolio whose
+		// activity files have just been deleted.
+		usePriceStore.getState().reset();
 	},
 }));

@@ -11,6 +11,7 @@ import { ExportSheetDialog } from "@/components/investment/export-sheet-dialog";
 import { HistoryWarning } from "@/components/investment/history-warning";
 import { HoldingsSummary } from "@/components/investment/holdings-summary";
 import { HoldingsTable } from "@/components/investment/holdings-table";
+import { ImportPricesDialog } from "@/components/investment/import-prices-dialog";
 import { SymbolIncomeTable } from "@/components/investment/symbol-income-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/metrics";
@@ -63,7 +64,12 @@ export function InvestmentOverview() {
 						{formatDate(dataset.dateRange.end)}
 					</p>
 				</div>
-				<ExportSheetDialog {...exportProps} variant="default" />
+				{/* Export and re-import are two halves of one loop, so they sit
+				together rather than the second hiding somewhere else. */}
+				<div className="flex flex-wrap items-center gap-2">
+					<ImportPricesDialog currency={currency} report={report} />
+					<ExportSheetDialog {...exportProps} variant="default" />
+				</div>
 			</div>
 
 			<HistoryWarning accounts={suspectAccounts} />
