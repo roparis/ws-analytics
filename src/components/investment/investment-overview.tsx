@@ -71,7 +71,11 @@ export function InvestmentOverview() {
 				<div className="flex flex-wrap items-center gap-2">
 					<ImportPricesDialog currency={currency} report={report} />
 					<ExportSheetDialog {...exportProps} />
-					<LivePricesButton currency={currency} report={report} />
+					<LivePricesButton
+						currency={currency}
+						range={dataset.dateRange}
+						report={report}
+					/>
 				</div>
 			</div>
 
