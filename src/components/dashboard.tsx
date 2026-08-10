@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-	AccountGroupList,
-	type Earned,
-} from "@/components/accounts/account-group-list";
+import { AccountGroupList } from "@/components/accounts/account-group-list";
 import { ActivitiesTable } from "@/components/activities-table";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import {
@@ -15,6 +12,7 @@ import {
 import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
 import { PdfExportButton } from "@/components/pdf-export-button";
+import { type Earned, earnedFrom, NO_EARNINGS } from "@/lib/analytics";
 import {
 	type ActivityFilters,
 	computeKpis,
@@ -68,42 +66,23 @@ export function Dashboard() {
 	// What the account made on top of that. Built from its parts rather than as
 	// `value − added`, so the tooltip's breakdown is the figure itself and can't
 	// drift from it — the two agree to the cent on every account in a real export.
+	//
+	// The decomposition itself lives in `earnedFrom` so the analytics page's
+	// per-year rows and this per-account one can't answer "earned" differently.
 	const earnedIn = useCallback(
 		(accountId: string): Earned => {
 			const account = report?.byAccount.find(
 				(candidate) => candidate.accountId === accountId,
 			);
-			if (!account || !dataset) {
-				return {
-					total: 0,
-					realized: 0,
-					dividends: 0,
-					interest: 0,
-					bonuses: 0,
-					feesAndTax: 0,
-				};
-			}
+			if (!account || !dataset) return NO_EARNINGS;
+
 			const kpis = computeKpis(
 				filterActivities(dataset.activities, {
 					...EMPTY_FILTERS,
 					accountIds: [accountId],
 				}),
 			);
-			const bonuses = kpis.cashback + kpis.promo;
-			const feesAndTax = account.fees + account.withholdingTax;
-			return {
-				total:
-					account.realizedPnl +
-					account.dividends +
-					account.interest +
-					bonuses -
-					feesAndTax,
-				realized: account.realizedPnl,
-				dividends: account.dividends,
-				interest: account.interest,
-				bonuses,
-				feesAndTax,
-			};
+			return earnedFrom(kpis, account.realizedPnl);
 		},
 		[dataset, report],
 	);

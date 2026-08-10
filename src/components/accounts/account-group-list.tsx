@@ -9,6 +9,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { type Earned, NO_EARNINGS } from "@/lib/analytics";
 import { formatCurrency, formatDate, groupByAccount } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/lib/wealthsimple";
@@ -39,35 +40,6 @@ interface AccountGroupListProps {
 	/** What the account made on top of the money put in. */
 	earnedFor?: (accountId: string) => Earned;
 }
-
-/**
- * Everything an account gained that didn't come out of your pocket.
- *
- * Reconciles exactly against `(book cost + cash) − money added` on every
- * account in a real export, which is the check that keeps the breakdown honest:
- * the parts have to add up to the gap they claim to explain.
- */
-export interface Earned {
-	/** Sum of the parts below. */
-	total: number;
-	/** Proceeds less the cost released, on positions actually sold. */
-	realized: number;
-	dividends: number;
-	interest: number;
-	/** Cash back, referrals and giveaways. */
-	bonuses: number;
-	/** Fees, margin interest and withholding tax. Positive; subtracted. */
-	feesAndTax: number;
-}
-
-export const NO_EARNINGS: Earned = {
-	total: 0,
-	realized: 0,
-	dividends: 0,
-	interest: 0,
-	bonuses: 0,
-	feesAndTax: 0,
-};
 
 function addEarned(a: Earned, b: Earned): Earned {
 	return {
