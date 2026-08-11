@@ -45,12 +45,12 @@ export function ClosedPositionsTable({
 				cell: (position) => position.accountType,
 			},
 			{
-				key: "invested",
-				header: "Invested",
+				key: "costBasis",
+				header: "Cost basis",
 				align: "right",
-				sortValue: (position) => position.invested,
+				sortValue: (position) => position.costBasis,
 				className: "tabular-nums",
-				cell: (position) => formatCurrency(position.invested, currency),
+				cell: (position) => formatCurrency(position.costBasis, currency),
 			},
 			{
 				key: "proceeds",
@@ -83,17 +83,17 @@ export function ClosedPositionsTable({
 				header: "Return",
 				align: "right",
 				sortValue: (position) =>
-					position.invested === 0
+					position.costBasis === 0
 						? null
-						: position.realizedPnl / position.invested,
+						: position.realizedPnl / position.costBasis,
 				className: "tabular-nums",
 				cell: (position) =>
-					position.invested === 0 ? (
+					position.costBasis === 0 ? (
 						"—"
 					) : (
 						<ReturnPill
 							label="Realised return on what you paid, excluding dividends"
-							value={position.realizedPnl / position.invested}
+							value={position.realizedPnl / position.costBasis}
 						/>
 					),
 			},

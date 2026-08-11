@@ -9,8 +9,17 @@ export interface ActivityFilters {
 }
 
 export interface Kpis {
+	/**
+	 * Cumulative money moved in from outside, net of what was moved back out —
+	 * the app's one portfolio-level "what did you put in" figure.
+	 *
+	 * Every `MoneyMovement` row counts, so a transfer between two of your own
+	 * accounts cancels out across the portfolio and reads as money arriving when
+	 * the activities are scoped to one of them. That is the point: it only moves
+	 * when money crosses the boundary of whatever is being measured, which is
+	 * what makes it the baseline a valuation is read against (`CapitalPoint`).
+	 */
 	netDeposits: number;
-	netCapitalDeployed: number;
 	income: number;
 	costs: number;
 	netCashFlow: number;
@@ -57,6 +66,9 @@ const COST_TYPES = new Set([
  */
 export const KNOWN_ACTIVITY_TYPES = new Set<string>([
 	"MoneyMovement",
+	// Buys and sells move cash *inside* the portfolio rather than across its
+	// boundary, so they belong to no line of the split — only to `netCashFlow`.
+	// `flowBreakdown` and `breakdownByYear` are where trade cash is reported.
 	"Trade",
 	// Share-count corrections (e.g. a ticker change). They carry no cash, so
 	// there is nothing to slot into the split — listed to keep them from
@@ -217,7 +229,6 @@ export function filterActivities(
 
 export function computeKpis(activities: Activity[]): Kpis {
 	let netDeposits = 0;
-	let trades = 0;
 	let income = 0;
 	let costs = 0;
 	let netCashFlow = 0;
@@ -252,8 +263,7 @@ export function computeKpis(activities: Activity[]): Kpis {
 			) {
 				transfersNet += amount;
 			}
-		} else if (activity.activityType === "Trade") trades += amount;
-		else if (INCOME_TYPES.has(activity.activityType)) {
+		} else if (INCOME_TYPES.has(activity.activityType)) {
 			income += amount;
 			if (activity.activityType === "Dividend") dividends += amount;
 			else if (activity.activityType === "Interest") interest += amount;
@@ -269,7 +279,6 @@ export function computeKpis(activities: Activity[]): Kpis {
 
 	return {
 		netDeposits,
-		netCapitalDeployed: -trades,
 		income,
 		costs: -costs,
 		netCashFlow,
@@ -688,10 +697,10 @@ export interface YearBreakdown {
 	year: string;
 	/**
 	 * Gross cash spent on buys, as a positive magnitude. Deliberately *not*
-	 * netted against `sold` — `Kpis.netCapitalDeployed` is the netted figure and
-	 * is what the rest of the app calls "Invested", so this one is named for the
-	 * `flowBreakdown` line it matches ("Bought investments") to keep the two
-	 * meanings from colliding.
+	 * netted against `sold`: netting the two answers "how much moved into
+	 * positions", which is a question about trading, not about money — and the
+	 * pair kept separate is the only place the app reports trade activity at all.
+	 * Named for the `flowBreakdown` line it matches ("Bought investments").
 	 */
 	bought: number;
 	/** Gross cash returned by sells. */
@@ -783,17 +792,13 @@ export interface CapitalPoint {
 	/** `YYYY-MM-DD`. */
 	date: string;
 	/**
-	 * Cumulative money moved in from outside, net of what was moved back out.
+	 * `Kpis.netDeposits`, accumulated to this date.
 	 *
 	 * The baseline a portfolio value is read against: value minus this is
 	 * everything the accounts made, whether it was sold, paid out or is still
-	 * only on paper. Every `MoneyMovement` row counts, so a transfer between two
-	 * of your own accounts cancels out across the portfolio and reads as money
-	 * arriving when the activities are scoped to one of them.
+	 * only on paper.
 	 */
 	deposits: number;
-	/** Cumulative cash spent on buys minus cash returned by sells, to this date. */
-	invested: number;
 	/** Cumulative distributions, interest and bonuses to this date. */
 	income: number;
 	/** Cumulative fees, margin interest and tax, as a positive magnitude. */
@@ -823,7 +828,7 @@ export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
 		else byDate.set(activity.transactionDate, [activity]);
 	}
 
-	const running = { deposits: 0, invested: 0, income: 0, costs: 0, cash: 0 };
+	const running = { deposits: 0, income: 0, costs: 0, cash: 0 };
 
 	return [...byDate.entries()]
 		.sort((a, b) => a[0].localeCompare(b[0]))
@@ -832,7 +837,6 @@ export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
 			// and the KPI tiles can never disagree about what counts as income.
 			const kpis = computeKpis(rows);
 			running.deposits += kpis.netDeposits;
-			running.invested += kpis.netCapitalDeployed;
 			running.income += kpis.income;
 			running.costs += kpis.costs;
 			running.cash += kpis.netCashFlow;

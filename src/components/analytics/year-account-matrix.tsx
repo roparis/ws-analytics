@@ -24,10 +24,9 @@ import type { ValuedYearStat } from "@/lib/price-history";
  */
 
 const CASH_MEASURES = [
-	{ value: "invested", label: "Invested" },
 	{ value: "deposited", label: "Deposited" },
 	{ value: "withdrawn", label: "Withdrawn" },
-	{ value: "medianMonthlyInvested", label: "Median/mo" },
+	{ value: "medianMonthlyDeposited", label: "Median/mo" },
 	{ value: "earned", label: "Earned" },
 ] as const;
 
@@ -45,13 +44,11 @@ type Measure =
 	| (typeof PRICED_MEASURES)[number]["value"];
 
 const CAPTIONS: Record<Measure, string> = {
-	invested:
-		"Cash put into the market that year, net of what selling returned. Not a valuation.",
 	deposited:
 		"Money that arrived from your bank. Transfers between your own accounts are excluded.",
 	withdrawn: "Money that left for your bank, shown as a positive amount.",
-	medianMonthlyInvested:
-		"The typical month's investing, taken across every month the loaded files cover — including the months you invested nothing, which is the point of a median.",
+	medianMonthlyDeposited:
+		"The typical month's deposit, taken across every month the loaded files cover — including the months you deposited nothing, which is the point of a median.",
 	earned:
 		"Realised gains, distributions, interest and bonuses, less fees and tax. Holdings you still own aren't in it — see Total return for the figure that counts them.",
 	value:
@@ -63,14 +60,12 @@ const CAPTIONS: Record<Measure, string> = {
 /** Null where a measure genuinely has no answer, which renders as a dash. */
 function measureOf(row: ValuedYearStat, measure: Measure): number | null {
 	switch (measure) {
-		case "invested":
-			return row.invested;
 		case "deposited":
 			return row.deposited;
 		case "withdrawn":
 			return row.withdrawn;
-		case "medianMonthlyInvested":
-			return row.medianMonthlyInvested;
+		case "medianMonthlyDeposited":
+			return row.medianMonthlyDeposited;
 		case "earned":
 			return row.earned.total;
 		case "value":
@@ -101,7 +96,7 @@ export function YearAccountMatrix({
 	stats,
 	totals,
 }: YearAccountMatrixProps) {
-	const [measure, setMeasure] = useState<Measure>("invested");
+	const [measure, setMeasure] = useState<Measure>("deposited");
 
 	// One priced row anywhere is enough: the measures exist for the dataset, and
 	// a year the history couldn't reach still answers "—" cell by cell.
@@ -114,7 +109,7 @@ export function YearAccountMatrix({
 	// toggle pointing at a measure that is no longer offered.
 	const active: Measure = measures.some((one) => one.value === measure)
 		? measure
-		: "invested";
+		: "deposited";
 
 	const rows = useMemo<MatrixRow[]>(() => {
 		const byYear = new Map<string, MatrixRow>();

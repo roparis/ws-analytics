@@ -9,7 +9,7 @@ export function RightRail({ dataset }: { dataset: MergedDataset }) {
 	const currency = dataset.currencies[0] ?? "CAD";
 
 	const rows = [
-		{ label: "Invested", value: kpis.netCapitalDeployed },
+		{ label: "Net deposits", value: kpis.netDeposits },
 		{ label: "Income", value: kpis.income },
 		{ label: "Fees & tax", value: -kpis.costs },
 		{ label: "Net change in cash", value: kpis.netCashFlow },

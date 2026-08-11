@@ -23,10 +23,13 @@ interface Figure {
 
 /**
  * The five figures a year's worth of activity boils down to: what came in, what
- * went out, what was put to work in the market, what it paid in dividends, and
- * what it cost. Deliberately icon-free (unlike `HeadlineFigures`) — five-plus
- * tiles with icons reads as clutter in a bar that's pinned on screen while
- * scrolling.
+ * went out, the two netted, what it paid in dividends, and what it cost.
+ * Deliberately icon-free (unlike `HeadlineFigures`) — five-plus tiles with icons
+ * reads as clutter in a bar that's pinned on screen while scrolling.
+ *
+ * "Net deposits" is not just `Deposited − Withdrawn`: it also carries transfers
+ * and cash-account movement, which those two exclude. On a year where the three
+ * disagree, the gap is the transfers line below.
  */
 export function YearFigures({ kpis, currency, accountType }: YearFiguresProps) {
 	const isCash = accountType !== undefined && isCashAccount(accountType);
@@ -46,14 +49,14 @@ export function YearFigures({ kpis, currency, accountType }: YearFiguresProps) {
 					value: -kpis.moneyOut,
 					tone: "text-destructive",
 				},
+				{
+					label: "Net deposits",
+					value: kpis.netDeposits,
+					tone: "text-foreground",
+				},
 			];
 
 	figures.push(
-		{
-			label: "Invested",
-			value: kpis.netCapitalDeployed,
-			tone: "text-foreground",
-		},
 		{
 			label: "Dividends",
 			value: kpis.dividends,

@@ -19,11 +19,6 @@ export function KpiCards({ kpis, currency, isAccountFiltered }: KpiCardsProps) {
 				: "Every cash movement, net. Bank deposits fund the accounts; transfers between your own accounts cancel out.",
 		},
 		{
-			label: "Net capital deployed",
-			value: kpis.netCapitalDeployed,
-			hint: "Cash spent on buys minus cash received from sells.",
-		},
-		{
 			label: "Dividends & income",
 			value: kpis.income,
 			hint: "Dividend distributions, interest, cash back and bonuses.",
@@ -37,7 +32,7 @@ export function KpiCards({ kpis, currency, isAccountFiltered }: KpiCardsProps) {
 
 	return (
 		<div className="flex flex-col gap-3">
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{tiles.map((tile) => (
 					<Card key={tile.label} size="sm">
 						<CardHeader>

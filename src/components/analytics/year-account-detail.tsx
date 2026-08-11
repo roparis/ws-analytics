@@ -98,12 +98,6 @@ export function YearAccountDetail({
 			...leading,
 			money("deposited", "Deposited", (row) => row.deposited),
 			money("withdrawn", "Withdrawn", (row) => -row.withdrawn),
-			money("invested", "Invested", (row) => row.invested),
-			money(
-				"medianMonthlyInvested",
-				"Median invested/mo",
-				(row) => row.medianMonthlyInvested,
-			),
 			money(
 				"medianMonthlyDeposited",
 				"Median deposited/mo",
