@@ -8,6 +8,7 @@ import { buildPositions } from "@/lib/positions";
 import {
 	type PriceHistory,
 	valuationKey,
+	valueOverTime,
 	valueYears,
 	withValuations,
 } from "@/lib/price-history";
@@ -181,6 +182,91 @@ function valuations2025() {
 	);
 	if (!valuation) throw new Error("expected a 2025 TFSA valuation");
 	return valuation;
+}
+
+describe("valueOverTime", () => {
+	/** The same holding, priced at three of the months the fixture covers. */
+	const MONTHLY: PriceHistory = {
+		...HISTORY,
+		monthlyCad: {
+			VFV: { "2024-01": 100, "2024-02": 110, "2025-06": 150, "2025-08": 160 },
+		},
+	};
+
+	it("returns one point per month, oldest first, at that month's close", () => {
+		const points = valueOverTime(ACTIVITIES, MONTHLY);
+
+		// January 2024 through June 2025 — every month, not only the ones with
+		// activity, or the line would jump a year and a half in one step.
+		expect(points).toHaveLength(18);
+		expect(points.map((point) => point.date)).toEqual(
+			[...points.map((point) => point.date)].sort(),
+		);
+		// February 2024 is a leap month; the point lands on the 29th.
+		expect(points[0].date).toBe("2024-01-31");
+		expect(points[1].date).toBe("2024-02-29");
+		expect(points[0].marketValue).toBe(10_000);
+		expect(points[1].marketValue).toBe(11_000);
+	});
+
+	it("reads share counts from the history as it stood that month", () => {
+		const sold = [
+			...ACTIVITIES,
+			trade({ quantity: -50, transactionDate: "2025-03-01", unitPrice: 140 }),
+		];
+		const points = valueOverTime(sold, MONTHLY);
+		const june = at(points, "2025-06-30");
+
+		// 50 shares left by June, but February 2024 still holds all 100.
+		expect(at(points, "2024-02-29").marketValue).toBe(11_000);
+		expect(june.marketValue).toBe(7_500);
+	});
+
+	it("counts cash beside the holdings", () => {
+		const june = at(valueOverTime(ACTIVITIES, MONTHLY), "2025-06-30");
+
+		// $10,000 in, $10,000 spent on shares, $50 of dividends left in cash.
+		expect(june.cashBalance).toBe(50);
+		expect(june.value).toBe(15_050);
+	});
+
+	it("holds a month with no close at book cost rather than at zero", () => {
+		// March 2024 isn't in the history — the same fallback `valueYears` takes,
+		// so the line dips to what was paid rather than to nothing.
+		const march = at(valueOverTime(ACTIVITIES, MONTHLY), "2024-03-31");
+
+		expect(march.missingSymbols).toEqual(["VFV"]);
+		expect(march.marketValue).toBe(0);
+		expect(march.unpricedBookCost).toBe(10_000);
+		expect(march.value).toBe(10_000);
+	});
+
+	it("stops the last point at the last day the files cover", () => {
+		const later = [
+			...ACTIVITIES,
+			makeActivity({
+				netCashAmount: 100,
+				quantity: 100,
+				transactionDate: "2025-08-10",
+			}),
+		];
+		const last = valueOverTime(later, MONTHLY).at(-1);
+
+		// August has 31 days, but the export reaches the 10th.
+		expect(last?.date).toBe("2025-08-10");
+		expect(last?.marketValue).toBe(16_000);
+	});
+
+	it("values nothing without a history", () => {
+		expect(valueOverTime(ACTIVITIES, null)).toEqual([]);
+		expect(valueOverTime([], MONTHLY)).toEqual([]);
+	});
+});
+
+function at(points: ReturnType<typeof valueOverTime>, date: string) {
+	const point = points.find((row) => row.date === date);
+	if (!point) throw new Error(`expected a point at ${date}`);
+	return point;
 }
 
 describe("withValuations", () => {

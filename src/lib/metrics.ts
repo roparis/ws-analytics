@@ -782,6 +782,16 @@ export function formatDate(value: string): string {
 export interface CapitalPoint {
 	/** `YYYY-MM-DD`. */
 	date: string;
+	/**
+	 * Cumulative money moved in from outside, net of what was moved back out.
+	 *
+	 * The baseline a portfolio value is read against: value minus this is
+	 * everything the accounts made, whether it was sold, paid out or is still
+	 * only on paper. Every `MoneyMovement` row counts, so a transfer between two
+	 * of your own accounts cancels out across the portfolio and reads as money
+	 * arriving when the activities are scoped to one of them.
+	 */
+	deposits: number;
 	/** Cumulative cash spent on buys minus cash returned by sells, to this date. */
 	invested: number;
 	/** Cumulative distributions, interest and bonuses to this date. */
@@ -796,11 +806,12 @@ export interface CapitalPoint {
  * The running story of where money has gone, one point per day that had
  * activity.
  *
- * This is the honest counterpart to a brokerage's net-worth line. That line
- * plots *market value*, which needs prices the export doesn't contain (§8).
- * What the file does support exactly is how much capital has been put to work
- * and what it has paid out — so that is what this returns, and a caller must
- * label it as such rather than implying it is a valuation.
+ * None of these is a valuation: market value needs prices the export doesn't
+ * contain (§8), and a caller without them must label these as what they are.
+ * What the file supports exactly is how much money arrived, how much of it was
+ * put to work, and what it paid out — and `deposits` is the line a valuation is
+ * read against once prices do exist, because the gap between the two is
+ * everything the accounts earned.
  *
  * Oldest first, because it is read left to right.
  */
@@ -812,7 +823,7 @@ export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
 		else byDate.set(activity.transactionDate, [activity]);
 	}
 
-	const running = { invested: 0, income: 0, costs: 0, cash: 0 };
+	const running = { deposits: 0, invested: 0, income: 0, costs: 0, cash: 0 };
 
 	return [...byDate.entries()]
 		.sort((a, b) => a[0].localeCompare(b[0]))
@@ -820,6 +831,7 @@ export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
 			// Delegates the classification rather than re-deriving it, so this line
 			// and the KPI tiles can never disagree about what counts as income.
 			const kpis = computeKpis(rows);
+			running.deposits += kpis.netDeposits;
 			running.invested += kpis.netCapitalDeployed;
 			running.income += kpis.income;
 			running.costs += kpis.costs;
@@ -833,10 +845,10 @@ export function capitalOverTime(activities: Activity[]): CapitalPoint[] {
  * cut so a cumulative line starts from its true running total rather than
  * springing from zero.
  */
-export function sinceDate(
-	points: CapitalPoint[],
+export function sinceDate<T extends CapitalPoint>(
+	points: T[],
 	from: string | null,
-): CapitalPoint[] {
+): T[] {
 	if (!from) return points;
 	const firstInside = points.findIndex((point) => point.date >= from);
 	if (firstInside <= 0) return firstInside === 0 ? points : [];

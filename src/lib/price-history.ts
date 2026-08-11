@@ -8,12 +8,12 @@ import { buildPositions } from "@/lib/positions";
 import type { Activity } from "@/lib/wealthsimple";
 
 /**
- * What the portfolio was worth at the end of each year, and what that says
- * about the year's return.
+ * What the portfolio was worth at the end of each year — and each month — and
+ * what that says about the return.
  *
  * `price-snapshot.ts` values holdings at one moment — now. This values them at
- * every year end the export covers, which is a different problem: the share
- * count changes with each year, and so does the price. Both are recoverable,
+ * every period end the export covers, which is a different problem: the share
+ * count changes with each one, and so does the price. Both are recoverable,
  * and neither is guessed:
  *
  * - **Shares** come from re-walking the activity history up to that date with
@@ -55,6 +55,129 @@ export function historyFromResponse(
 		monthlyCad,
 		unpriced: response.misses.map((miss) => miss.symbol).sort(),
 	};
+}
+
+export interface ValuePoint {
+	/** `YYYY-MM-DD` — the month end, clipped to the last day the export covers. */
+	date: string;
+	/** `marketValue + unpricedBookCost + cashBalance` — everything, at that date. */
+	value: number;
+	/** Σ shares × close, over the holdings this history could price. */
+	marketValue: number;
+	/** Book cost of exactly those holdings. */
+	pricedBookCost: number;
+	/** Book cost of the ones it couldn't price, carried in `value` at cost. */
+	unpricedBookCost: number;
+	cashBalance: number;
+	/** Symbols held that month with no close for it. */
+	missingSymbols: string[];
+}
+
+/**
+ * What everything was worth at the end of each month the activities cover.
+ *
+ * `valueYears` answers the same question once a year for the analytics tables;
+ * the lead chart needs a line, so this walks the same ground month by month.
+ * The rules are `valueYears`' rules — shares from re-walking the history with
+ * `buildPositions`, prices from that month's own close, an unpriced holding
+ * held at what was paid for it — with one difference worth stating: cash is in
+ * the figure. The chart draws this against capital deployed, and money sitting
+ * uninvested is still money you have.
+ *
+ * Scoped by whatever activities it is given, so a page showing one account gets
+ * that account's line for free.
+ */
+export function valueOverTime(
+	activities: Activity[],
+	history: PriceHistory | null,
+): ValuePoint[] {
+	if (!history || activities.length === 0) return [];
+
+	// Sorted once, then read as prefixes: `valueYears` re-filters the whole array
+	// per bucket, which is affordable a dozen times and not a hundred.
+	const sorted = [...activities].sort((a, b) =>
+		a.transactionDate.localeCompare(b.transactionDate),
+	);
+	const lastDate = sorted[sorted.length - 1].transactionDate;
+
+	const points: ValuePoint[] = [];
+	let index = 0;
+
+	for (const month of monthsBetween(
+		sorted[0].transactionDate.slice(0, 7),
+		lastDate.slice(0, 7),
+	)) {
+		while (
+			index < sorted.length &&
+			sorted[index].transactionDate.slice(0, 7) <= month
+		) {
+			index += 1;
+		}
+		if (index === 0) continue;
+
+		const report = buildPositions(sorted.slice(0, index));
+		const missing = new Set<string>();
+		let marketValue = 0;
+		let pricedBookCost = 0;
+		let unpricedBookCost = 0;
+		let cashBalance = 0;
+
+		for (const rollup of report.byAccountType) {
+			cashBalance += rollup.cashBalance;
+		}
+
+		for (const position of report.open) {
+			const price = history.monthlyCad[position.symbol]?.[month];
+			if (price === undefined) {
+				missing.add(position.symbol);
+				unpricedBookCost += position.bookCost;
+				continue;
+			}
+
+			marketValue += position.shares * price;
+			pricedBookCost += position.bookCost;
+		}
+
+		points.push({
+			// The last month is only as far along as the files are; saying so keeps
+			// the line from claiming a close it never saw.
+			date: min(endOfMonth(month), lastDate),
+			cashBalance: round(cashBalance),
+			marketValue: round(marketValue),
+			missingSymbols: [...missing].sort(),
+			pricedBookCost: round(pricedBookCost),
+			unpricedBookCost: round(unpricedBookCost),
+			value: round(marketValue + unpricedBookCost + cashBalance),
+		});
+	}
+
+	return points;
+}
+
+/** Every `YYYY-MM` from one to the other, inclusive. */
+function monthsBetween(from: string, to: string): string[] {
+	const months: string[] = [];
+	let year = Number(from.slice(0, 4));
+	let month = Number(from.slice(5, 7));
+
+	while (`${year}-${String(month).padStart(2, "0")}` <= to) {
+		months.push(`${year}-${String(month).padStart(2, "0")}`);
+		month += 1;
+		if (month > 12) {
+			month = 1;
+			year += 1;
+		}
+	}
+
+	return months;
+}
+
+/** `2024-02` -> `2024-02-29`. Leap years included, via day zero of the next. */
+function endOfMonth(month: string): string {
+	const year = Number(month.slice(0, 4));
+	const index = Number(month.slice(5, 7));
+	const days = new Date(Date.UTC(year, index, 0)).getUTCDate();
+	return `${month}-${String(days).padStart(2, "0")}`;
 }
 
 export interface YearValuation {
