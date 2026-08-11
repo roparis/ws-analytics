@@ -115,7 +115,7 @@ That unlocks the figure the page has never had:
 
 | Column | What it is | Needs prices |
 |---|---|---|
-| Deposited, Withdrawn, Invested, Median/mo | Cash facts, straight from the activity rows | No — and they must not change |
+| Deposited, Withdrawn, Median/mo | Cash facts, straight from the activity rows | No — and they must not change |
 | Dividends, Fees & tax, **Earned** | What the year paid out, in cash | No |
 | **Value at year end** | Holdings at that December's close, plus cash | Yes |
 | **Unrealised change** | How the paper gain on unsold holdings moved | Yes |
@@ -171,8 +171,17 @@ deployed answers "how much is in positions" and moves every time you trade;
 against a value that includes cash it would show a gap that changes when you
 buy. Net deposits — every `MoneyMovement` row, so a transfer between two of
 your own accounts cancels — only moves when money crosses the boundary of the
-portfolio, which makes the gap exactly what the accounts earned. `CapitalPoint`
-carries both, and the toggle beside the chart names the one it is drawing.
+portfolio, which makes the gap exactly what the accounts earned.
+
+**This argument later won everywhere.** The chart was the only surface using it;
+every other one led with capital deployed under the label "Invested", so the app
+disagreed with its own lead chart. `Kpis.netCapitalDeployed` and
+`CapitalPoint.invested` have since been removed outright and net deposits is now
+the single portfolio-level figure — the analytics page dropped its Invested and
+Median-invested/mo columns rather than restate deposits a fourth way beside
+Deposited, Withdrawn and Transfers. The one survivor of the name is
+`Position.costBasis` (renamed from `invested`), which is per-holding gross buys
+and answers a different question: what `realizedPnl` is a return on.
 
 Three things it does deliberately:
 

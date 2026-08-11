@@ -199,12 +199,11 @@ describe("yearTotals", () => {
 		expect(rows[0].accountType).toBe(ALL_ACCOUNT_TYPES);
 	});
 
-	it("reports deposits, withdrawals and what was invested", () => {
+	it("reports deposits and withdrawals", () => {
 		const [current] = yearTotals(activities, report, FULL);
 
 		expect(current.deposited).toBeCloseTo(2000, 6);
 		expect(current.withdrawn).toBeCloseTo(300, 6);
-		expect(current.invested).toBeCloseTo(480, 6);
 	});
 
 	it("counts a month with no deposit as a real zero in the median", () => {
@@ -353,7 +352,7 @@ describe("yearAccountStats", () => {
 
 		expect(sum((row) => row.deposited)).toBeCloseTo(total.deposited, 6);
 		expect(sum((row) => row.withdrawn)).toBeCloseTo(total.withdrawn, 6);
-		expect(sum((row) => row.invested)).toBeCloseTo(total.invested, 6);
+		expect(sum((row) => row.transfers)).toBeCloseTo(total.transfers, 6);
 		expect(sum((row) => row.earned.total)).toBeCloseTo(total.earned.total, 6);
 	});
 });

@@ -193,7 +193,7 @@ describe("closing a position", () => {
 
 		expect(position.shares).toBe(0);
 		expect(position.bookCost).toBe(0);
-		expect(position.invested - position.proceeds).toBeCloseTo(
+		expect(position.costBasis - position.proceeds).toBeCloseTo(
 			-position.realizedPnl,
 			6,
 		);

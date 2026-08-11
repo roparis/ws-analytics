@@ -81,10 +81,16 @@ export interface Position {
 	realizedPnl: number;
 	/** Σ `netCashAmount` over sells — cash received, already net of commission. */
 	proceeds: number;
-	/** Σ `|netCashAmount|` over buys — cash paid, already including commission. */
-	invested: number;
+	/**
+	 * Σ `|netCashAmount|` over buys — cash paid, already including commission.
+	 *
+	 * Every buy the pool ever made, never reduced by a sell, so this is what
+	 * `realizedPnl` is a return *on*. `bookCost` is the other half of the pair:
+	 * only the shares still held, and 0 once the position is closed.
+	 */
+	costBasis: number;
 	dividends: number;
-	/** Informational. Already inside `invested` and `proceeds` — never add it again. */
+	/** Informational. Already inside `costBasis` and `proceeds` — never add it again. */
 	commission: number;
 	listing: Listing;
 	/** The last FX rate Wealthsimple quoted. Informational only (§4). */
@@ -145,7 +151,7 @@ export interface SymbolRollup {
 	listing: Listing;
 	shares: number;
 	bookCost: number;
-	invested: number;
+	costBasis: number;
 	proceeds: number;
 	realizedPnl: number;
 	dividends: number;
@@ -261,7 +267,7 @@ interface Pool {
 	bookCost: number;
 	realizedPnl: number;
 	proceeds: number;
-	invested: number;
+	costBasis: number;
 	dividends: number;
 	commission: number;
 	lastFxRate: number | null;
@@ -551,7 +557,7 @@ export function buildPositions(
 			bookCost: 0,
 			realizedPnl: 0,
 			proceeds: 0,
-			invested: 0,
+			costBasis: 0,
 			dividends: 0,
 			commission: 0,
 			lastFxRate: null,
@@ -627,7 +633,7 @@ export function buildPositions(
 				const cost = Math.abs(activity.netCashAmount);
 				pool.shares += quantity;
 				pool.bookCost += cost;
-				pool.invested += cost;
+				pool.costBasis += cost;
 				continue;
 			}
 
@@ -711,7 +717,7 @@ export function buildPositions(
 		averageCost: pool.shares > 0 ? pool.bookCost / pool.shares : null,
 		realizedPnl: pool.realizedPnl,
 		proceeds: pool.proceeds,
-		invested: pool.invested,
+		costBasis: pool.costBasis,
 		dividends: pool.dividends,
 		commission: pool.commission,
 		listing: detectListing(pool.rows),
@@ -797,7 +803,7 @@ function rollUpSymbols(positions: Position[]): SymbolRollup[] {
 				listing: position.listing,
 				shares: 0,
 				bookCost: 0,
-				invested: 0,
+				costBasis: 0,
 				proceeds: 0,
 				realizedPnl: 0,
 				dividends: 0,
@@ -811,7 +817,7 @@ function rollUpSymbols(positions: Position[]): SymbolRollup[] {
 
 		row.shares += position.shares;
 		row.bookCost += position.bookCost;
-		row.invested += position.invested;
+		row.costBasis += position.costBasis;
 		row.proceeds += position.proceeds;
 		row.realizedPnl += position.realizedPnl;
 		row.dividends += position.dividends;

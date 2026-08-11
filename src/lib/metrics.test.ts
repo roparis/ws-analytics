@@ -503,13 +503,12 @@ describe("capitalOverTime", () => {
 		}),
 	];
 
-	it("runs deposits and capital deployed as separate totals", () => {
+	it("leaves deposits flat when money only moves inside the account", () => {
 		const points = capitalOverTime(ACTIVITIES);
 
-		// Buying shares moves money within the account: it is capital deployed,
-		// and it is not a deposit.
+		// Buying shares moves money within the account, so it never touches the
+		// deposits line — that is the property the whole app's headline rests on.
 		expect(points.map((point) => point.deposits)).toEqual([1000, 1000, 1000]);
-		expect(points.map((point) => point.invested)).toEqual([0, 600, 600]);
 		expect(points.at(-1)?.income).toBe(40);
 	});
 
