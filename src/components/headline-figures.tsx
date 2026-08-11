@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownUp, Coins, Receipt, TrendingUp } from "lucide-react";
+import { ArrowDownUp, Coins, Receipt } from "lucide-react";
 import { formatCurrency, isCashAccount, type Kpis } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +10,10 @@ interface HeadlineFiguresProps {
 	/** `sm` is the in-card size; `md` leads a page header. */
 	size?: "sm" | "md";
 	/**
-	 * Set when the figures cover a single account type. Chequing-style accounts
-	 * lead with cash movement instead of capital deployed — `computeKpis` already
-	 * excludes them from the investment figures, so "Invested $0.00" on a
-	 * spending account would read as a bug rather than a fact.
+	 * Set when the figures cover a single account type. Only the label changes:
+	 * on a chequing account the same figure is salary arriving and rent leaving,
+	 * not money being put to work, so calling it "Net deposits" there would
+	 * overstate what it means.
 	 */
 	accountType?: string;
 }
@@ -42,9 +42,10 @@ function incomeLabel(kpis: Kpis): string {
 }
 
 /**
- * The three figures every summary surface leads with. Bank funding is just
- * moving your own money, so these report what you actually did with it: capital
- * deployed into the market, income earned, and what it cost.
+ * The three figures every summary surface leads with: how much of your own
+ * money crossed the boundary, what it earned once it was there, and what it
+ * cost. Buys and sells are deliberately absent — they move cash between the
+ * portfolio's own pockets and say nothing about how much you put in.
  */
 export function HeadlineFigures({
 	kpis,
@@ -55,19 +56,12 @@ export function HeadlineFigures({
 	const isCash = accountType !== undefined && isCashAccount(accountType);
 
 	const figures = [
-		isCash
-			? {
-					label: "Net cash movement",
-					value: kpis.netDeposits,
-					Icon: ArrowDownUp,
-					tone: "text-foreground",
-				}
-			: {
-					label: "Invested",
-					value: kpis.netCapitalDeployed,
-					Icon: TrendingUp,
-					tone: "text-foreground",
-				},
+		{
+			label: isCash ? "Net cash movement" : "Net deposits",
+			value: kpis.netDeposits,
+			Icon: ArrowDownUp,
+			tone: "text-foreground",
+		},
 		{
 			label: incomeLabel(kpis),
 			value: kpis.income,

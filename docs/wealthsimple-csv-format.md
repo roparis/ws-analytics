@@ -222,12 +222,12 @@ its cash direction.
 **`Interest` vs `InterestCharged` are opposites.** Near-identical names, opposite sign,
 opposite meaning. `Interest` is income earned on a cash balance (every row in the reference
 export is in the Chequing account). `InterestCharged` is margin interest paid (every row in the
-reference export is in the margin account). [metrics.ts:41](../src/lib/metrics.ts:41) already
+reference export is in the margin account). [metrics.ts:53](../src/lib/metrics.ts:53) already
 calls this out.
 
 **`AdministrativePayment` is money coming *in*.** Every row is positive
 (`MANAGEMENT_FEE_REFUND`). It sits in `COST_TYPES` in
-[metrics.ts:45](../src/lib/metrics.ts:45), which is *deliberate and correct* — costs are
+[metrics.ts:54](../src/lib/metrics.ts:54), which is *deliberate and correct* — costs are
 computed as `-Σ net_cash` over that set, so a positive refund reduces reported costs. Net cost
 is therefore lower than gross cost. Just don't ever re-label the type itself as an expense in
 the UI.
@@ -349,7 +349,7 @@ separate `account_id` ending `USD`. Not present in the reference export.
 Account types observed: `Group RRSP`, `TFSA`, `FHSA`, `Chequing`, `Crypto`,
 `Non-registered margin`. **Assumption:** other Wealthsimple products (`RRSP`, `RESP`, `Cash`,
 `Save`, `LIRA`, `RRIF`, `Joint`) would use similar labels. The
-`isCashAccount` keyword match in [metrics.ts:95](../src/lib/metrics.ts:95) covers
+`isCashAccount` keyword match in [metrics.ts:107](../src/lib/metrics.ts:107) covers
 `cash`/`chequing`/`checking`/`save`/`spend`, which is the right shape of defence.
 
 ---

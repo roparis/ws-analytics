@@ -96,8 +96,8 @@ export function YearBreakdownChart({
 			<CardHeader>
 				<CardTitle>Bought, sold and earned by year</CardTitle>
 				<CardDescription>
-					Gross buys and sells, not netted against each other — "Invested" above
-					is the difference between them · {range}
+					Gross buys and sells, not netted against each other — trading
+					activity, not money added · {range}
 				</CardDescription>
 			</CardHeader>
 			<CardContent>

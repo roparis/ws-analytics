@@ -101,9 +101,10 @@ export function MonthDetail({ monthKey }: { monthKey: string }) {
 			</Card>
 
 			<p className="text-muted-foreground text-xs">
-				Invested is the net cash you put into securities (buys minus sells).
-				Income covers dividends, interest and cash back. The full picture — bank
-				funding, transfers and spending — is in the breakdown below.
+				Net deposits is the money you moved in from outside, less what you took
+				back out; transfers between your own accounts cancel. Income covers
+				dividends, interest and cash back. What you bought and sold that month
+				is in the breakdown below.
 			</p>
 
 			<KpiCards currency={currency} isAccountFiltered={isScoped} kpis={kpis} />

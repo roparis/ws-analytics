@@ -978,7 +978,7 @@ function buildYearSheet(activities: Activity[]): SheetGrid {
 			"Activities",
 			"Deposits in (CAD)",
 			"Withdrawals out (CAD)",
-			"Net invested (CAD)",
+			"Net deposits (CAD)",
 			"Dividends (CAD)",
 			"Interest (CAD)",
 			"Cash back & bonuses (CAD)",
@@ -1000,7 +1000,7 @@ function buildYearSheet(activities: Activity[]): SheetGrid {
 			num(kpis.count, 0),
 			num(kpis.moneyIn, 2),
 			num(-kpis.moneyOut, 2),
-			num(kpis.netCapitalDeployed, 2),
+			num(kpis.netDeposits, 2),
 			num(kpis.dividends, 2),
 			num(kpis.interest, 2),
 			num(kpis.cashback + kpis.promo, 2),
@@ -1030,7 +1030,7 @@ function buildYearSheet(activities: Activity[]): SheetGrid {
 	const types = [...new Set(activities.map((row) => row.accountType))].sort();
 	if (years.length > 0 && types.length > 0) {
 		sheet.push([]);
-		sheet.push([text("NET INVESTED BY YEAR AND ACCOUNT TYPE (CAD)")]);
+		sheet.push([text("NET DEPOSITS BY YEAR AND ACCOUNT TYPE (CAD)")]);
 		const matrixHeader = sheet.push(
 			["Year", ...types].map((header) => text(header)),
 		);
@@ -1042,9 +1042,7 @@ function buildYearSheet(activities: Activity[]): SheetGrid {
 					(activity) => activity.accountType === type,
 				);
 				cells.push(
-					rows.length === 0
-						? num(0, 2)
-						: num(computeKpis(rows).netCapitalDeployed, 2),
+					rows.length === 0 ? num(0, 2) : num(computeKpis(rows).netDeposits, 2),
 				);
 			}
 			sheet.push(cells);
@@ -1077,7 +1075,7 @@ function buildClosedSheet(report: PositionsReport): {
 			"Account type",
 			"Symbol",
 			"Name",
-			"Invested (CAD)",
+			"Cost basis (CAD)",
 			"Proceeds (CAD)",
 			"Realised P&L (CAD)",
 			"Realised %",
@@ -1098,7 +1096,7 @@ function buildClosedSheet(report: PositionsReport): {
 			text(position.accountType),
 			text(position.symbol),
 			text(position.name),
-			num(position.invested, 2),
+			num(position.costBasis, 2),
 			num(position.proceeds, 2),
 			gainLoss(num(position.realizedPnl, 2)),
 			gainLossPercent(formula(`=IF(E${r}=0,"",TO_PERCENT(G${r}/E${r}))`)),

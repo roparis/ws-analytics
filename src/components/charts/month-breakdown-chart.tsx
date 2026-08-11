@@ -26,29 +26,32 @@ import { formatCurrency, groupByMonth } from "@/lib/metrics";
 import type { Activity } from "@/lib/wealthsimple";
 
 /**
- * Invested runs to thousands while income and fees run to tens, so the three
+ * Deposits run to thousands while income and fees run to tens, so the three
  * can't share a y-axis without flattening the smaller two into the baseline —
  * and a second axis would invent a correlation that isn't in the data. Small
  * multiples instead: one panel per measure, each with its own scale, stacked on
  * a shared month axis so the periods still line up for comparison.
  */
 const chartConfig = {
-	invested: { label: "Invested", theme: { light: "#0284c7", dark: "#2b95dd" } },
+	deposits: {
+		label: "Net deposits",
+		theme: { light: "#0284c7", dark: "#2b95dd" },
+	},
 	income: { label: "Income", theme: { light: "#059669", dark: "#0aa876" } },
 	fees: { label: "Fees & tax", theme: { light: "#dc2626", dark: "#ef4444" } },
 } satisfies ChartConfig;
 
 /**
  * Heights are per-panel, not uniform. A single rebalance month can be ten times
- * a routine contribution, so at a shared height the regular monthly investing —
+ * a routine contribution, so at a shared height the regular monthly funding —
  * the thing you actually want to read — collapses into a hairline against the
- * outlier. Invested gets the most room and an extra tick because it is the only
+ * outlier. Deposits get the most room and an extra tick because it is the only
  * measure that swings both ways; the last panel carries the month labels and
  * needs the extra band for them.
  */
 const PANELS = [
 	{
-		key: "invested",
+		key: "deposits",
 		height: "h-32",
 		ticks: 4,
 		// `--color-*` is scoped to ChartContainer, and this swatch sits outside it
@@ -74,7 +77,7 @@ interface MonthRow {
 	key: string;
 	label: string;
 	tick: string;
-	invested: number;
+	deposits: number;
 	income: number;
 	fees: number;
 	net: number;
@@ -101,7 +104,7 @@ function MonthTooltip({
 	// Every panel shows the same four figures, so hovering anywhere gives the
 	// whole month rather than just the measure under the cursor.
 	const lines: { key: PanelKey | "net"; label: string; value: number }[] = [
-		{ key: "invested", label: "Invested", value: row.invested },
+		{ key: "deposits", label: "Net deposits", value: row.deposits },
 		{ key: "income", label: "Income", value: row.income },
 		{ key: "fees", label: "Fees & tax", value: row.fees },
 		{ key: "net", label: "Net", value: row.net },
@@ -152,7 +155,7 @@ export function MonthBreakdownChart({
 					key: month.key,
 					label: month.label,
 					tick: tickLabel(month.key),
-					invested: month.kpis.netCapitalDeployed,
+					deposits: month.kpis.netDeposits,
 					income: month.kpis.income,
 					// `costs` is a positive magnitude; show it as money leaving.
 					fees: -month.kpis.costs,
@@ -165,7 +168,7 @@ export function MonthBreakdownChart({
 	if (data.length === 0) return null;
 
 	const totals = {
-		invested: data.reduce((sum, row) => sum + row.invested, 0),
+		deposits: data.reduce((sum, row) => sum + row.deposits, 0),
 		income: data.reduce((sum, row) => sum + row.income, 0),
 		fees: data.reduce((sum, row) => sum + row.fees, 0),
 	};
@@ -210,7 +213,7 @@ export function MonthBreakdownChart({
 							<thead>
 								<tr className="text-muted-foreground text-xs">
 									<th className="py-1 text-left font-medium">Month</th>
-									<th className="py-1 text-right font-medium">Invested</th>
+									<th className="py-1 text-right font-medium">Net deposits</th>
 									<th className="py-1 text-right font-medium">Income</th>
 									<th className="py-1 text-right font-medium">Fees & tax</th>
 									<th className="py-1 text-right font-medium">Net</th>
@@ -221,7 +224,7 @@ export function MonthBreakdownChart({
 									<tr key={row.key}>
 										<td className="py-1">{row.label}</td>
 										<td className="py-1 text-right tabular-nums">
-											{formatCurrency(row.invested, currency)}
+											{formatCurrency(row.deposits, currency)}
 										</td>
 										<td className="py-1 text-right tabular-nums">
 											{formatCurrency(row.income, currency)}
