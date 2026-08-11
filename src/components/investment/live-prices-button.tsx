@@ -1,9 +1,14 @@
 "use client";
 
 import { Loader2, Zap } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
 	fetchLivePrices,
 	fetchPriceHistory,
@@ -19,6 +24,12 @@ import { usePriceStore } from "@/stores/prices";
 
 /**
  * One click instead of the export-open-download-import loop.
+ *
+ * It sits in the sidebar, below the data card: the prices it fetches feed every
+ * page, so pinning it to Investments or Analytics made a global switch look
+ * like it belonged to whichever page you happened to be on. The tooltip carries
+ * what a button that reaches the network owes the reader — what it asks for,
+ * what leaves the device, and what changes once it lands.
  *
  * The sheet round trip stays exactly where it was, and on purpose: it needs no
  * server, it survives Yahoo changing its mind, and its ticker column is
@@ -38,10 +49,19 @@ interface LivePricesButtonProps {
 	/** The period to pull monthly closes for — `dataset.dateRange`. */
 	range: { start: string; end: string };
 	variant?: "default" | "outline";
+	/** Applied to the button, so the sidebar can stretch it to the full width. */
+	className?: string;
+	/** Icon only, for the mobile header where the label doesn't fit. */
+	compact?: boolean;
+	/** Extra lines for the tooltip — how fresh the prices on hand are. */
+	hint?: ReactNode;
 }
 
 export function LivePricesButton({
+	className,
+	compact = false,
 	currency,
+	hint,
 	range,
 	report,
 	variant = "default",
@@ -120,23 +140,51 @@ export function LivePricesButton({
 		}
 	}
 
+	const label =
+		pending === "quotes"
+			? "Fetching prices…"
+			: pending === "history"
+				? "Fetching history…"
+				: "Fetch live prices";
+
 	return (
-		<Button
-			disabled={pending !== null || symbols.length === 0}
-			onClick={() => void fetchPrices()}
-			variant={variant}
-		>
-			{pending ? (
-				<Loader2 className="size-4 animate-spin" />
-			) : (
-				<Zap className="size-4" />
-			)}
-			{pending === "quotes"
-				? "Fetching prices…"
-				: pending === "history"
-					? "Fetching history…"
-					: "Fetch live prices"}
-		</Button>
+		<Tooltip>
+			{/* The trigger *is* the button — a wrapper around it would put a
+			non-interactive element between the pointer and the click target. */}
+			<TooltipTrigger
+				onClick={() => void fetchPrices()}
+				render={
+					<Button
+						aria-label={compact ? label : undefined}
+						className={className}
+						disabled={pending !== null || symbols.length === 0}
+						size={compact ? "icon-sm" : "default"}
+						variant={variant}
+					/>
+				}
+			>
+				{pending ? (
+					<Loader2 className="size-4 animate-spin" />
+				) : (
+					<Zap className="size-4" />
+				)}
+				{!compact && label}
+			</TooltipTrigger>
+			<TooltipContent className="max-w-xs">
+				<span className="flex flex-col gap-1">
+					<span>
+						Asks Yahoo Finance today&apos;s price for the {symbols.length}{" "}
+						{symbols.length === 1 ? "ticker" : "tickers"} you hold, then the
+						monthly closes behind them. Only those symbols leave this device.
+					</span>
+					<span>
+						Every page then values your holdings at the market instead of what
+						you paid, and the analytics page gains its year-by-year columns.
+					</span>
+					{hint}
+				</span>
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 

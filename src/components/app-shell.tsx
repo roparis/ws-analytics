@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { DataSourceCard } from "@/components/data-source-card";
+import { LivePricesCard } from "@/components/live-prices-card";
 import { matchDatasetValue } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import { useDatasetStore } from "@/stores/dataset";
@@ -99,8 +100,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 						</nav>
 					)}
 
-					<div className="mt-auto">
+					{/* Prices sit under the data card because they're the same kind of
+					thing: what the whole app is reading from, not a feature of one
+					page. */}
+					<div className="mt-auto flex flex-col gap-2">
 						<DataSourceCard />
+						<LivePricesCard />
 					</div>
 				</div>
 			</header>
@@ -109,7 +114,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 				{/* Mobile header — the sidebar is hidden below lg. */}
 				<div className="flex items-center justify-between py-4 lg:hidden">
 					<span className="font-semibold">ws-analytics</span>
-					<DataSourceCard compact />
+					<div className="flex items-center gap-1">
+						<DataSourceCard compact />
+						<LivePricesCard compact />
+					</div>
 				</div>
 				<Breadcrumbs />
 				{children}
