@@ -37,6 +37,17 @@ import type { ProjectionPoint } from "@/lib/projection";
 
 const CONTRIBUTED_KEY = "contributed";
 
+/** Where a series' net deposits ride along in the row, unplotted. */
+const depositKey = (key: string) => `${key}__in`;
+
+/**
+ * The tooltip's two money columns. Fixed minimums rather than content widths,
+ * so the figures line up down the column instead of stepping in and out with
+ * the length of each account's name.
+ */
+const IN_COLUMN = "min-w-24 shrink-0 text-right tabular-nums";
+const VALUE_COLUMN = "min-w-28 shrink-0 text-right tabular-nums";
+
 interface ProjectionChartProps {
 	points: ProjectionPoint[];
 	series: AccountTypeSeries[];
@@ -61,7 +72,9 @@ export function ProjectionChart({
 	}, [series]);
 
 	// Recharts wants one flat object per row, so the per-type map is spread out
-	// into the positional keys the config was built with.
+	// into the positional keys the config was built with. Each series carries a
+	// second key holding what went into that account, which nothing plots — the
+	// tooltip reads it to show growth beside the money that bought it.
 	const data = useMemo(
 		() =>
 			points.map((point) => {
@@ -72,6 +85,8 @@ export function ProjectionChart({
 				};
 				for (const item of series) {
 					row[item.key] = point.byType[item.accountType] ?? 0;
+					row[depositKey(item.key)] =
+						point.contributedByType[item.accountType] ?? 0;
 				}
 				return row;
 			}),
@@ -126,24 +141,76 @@ export function ProjectionChart({
 				<ChartTooltip
 					content={
 						<ChartTooltipContent
-							formatter={(value, name, item) => (
-								<>
-									<div
-										className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-										style={{ backgroundColor: item?.color }}
-									/>
-									<div className="flex flex-1 items-center justify-between gap-4 leading-none">
-										<span className="text-muted-foreground">
-											{chartConfig[name as string]?.label ?? name}
-										</span>
-										<span className="font-medium font-mono text-foreground tabular-nums">
+							formatter={(value, name, item) =>
+								// The dashed line's row carries the two columns' totals and
+								// nothing else: the rule above it and the column headings have
+								// already said what they are, and a label would only repeat
+								// the heading a row later.
+								name === CONTRIBUTED_KEY ? (
+									<div className="flex w-full items-center gap-4 border-border/60 border-t pt-1.5 leading-none">
+										<span className="flex-1" />
+										<span
+											className={`${IN_COLUMN} font-mono text-muted-foreground`}
+										>
 											{formatCurrency(Number(value), currency)}
 										</span>
+										<span
+											className={`${VALUE_COLUMN} font-medium font-mono text-foreground`}
+										>
+											{formatCurrency(
+												Number(item?.payload?.total ?? 0),
+												currency,
+											)}
+										</span>
 									</div>
-								</>
-							)}
+								) : (
+									<>
+										<div
+											className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+											style={{ backgroundColor: item?.color }}
+										/>
+										<div className="flex flex-1 items-center gap-4 leading-none">
+											<span className="flex-1 text-muted-foreground">
+												{chartConfig[name as string]?.label ?? name}
+											</span>
+											<span
+												className={`${IN_COLUMN} font-mono text-muted-foreground`}
+											>
+												{formatCurrency(
+													Number(
+														item?.payload?.[depositKey(String(name))] ?? 0,
+													),
+													currency,
+												)}
+											</span>
+											<span
+												className={`${VALUE_COLUMN} font-medium font-mono text-foreground`}
+											>
+												{formatCurrency(Number(value), currency)}
+											</span>
+										</div>
+									</>
+								)
+							}
 							indicator="dot"
-							labelFormatter={(label) => `In ${label}`}
+							labelFormatter={(label) => (
+								// The captions ride on the label row: they name both columns
+								// once, and "estimated" belongs on the heading rather than on
+								// every figure under it.
+								<div className="flex w-full items-center gap-4">
+									<span className="flex-1">In {label}</span>
+									<span
+										className={`${IN_COLUMN} font-normal text-muted-foreground text-xs`}
+									>
+										Put in
+									</span>
+									<span
+										className={`${VALUE_COLUMN} font-normal text-muted-foreground text-xs`}
+									>
+										Estimated value
+									</span>
+								</div>
+							)}
 						/>
 					}
 				/>
@@ -163,7 +230,9 @@ export function ProjectionChart({
 					/>
 				))}
 				{/* The honest counterweight to a climbing stack: everything above this
-				line is growth the reader assumed, not money they have. */}
+				line is growth the reader assumed, not money they have. Its tooltip row
+				is the totals line, because what it plots is exactly the sum of the
+				deposit column. */}
 				<Line
 					dataKey={CONTRIBUTED_KEY}
 					dot={false}
