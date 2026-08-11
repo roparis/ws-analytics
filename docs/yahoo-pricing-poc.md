@@ -5,7 +5,8 @@
 `/analytics` that values your holdings against Yahoo Finance in one click,
 instead of the export-to-Sheets and import-the-CSV-back round trip — and, from
 the same click, a year-by-year valuation that finally puts unrealised gain on
-the analytics page (§7).
+the analytics page (§7) and a value line beside net deposits in every page's
+lead chart (§5.1).
 
 ---
 
@@ -47,7 +48,9 @@ buildPositions ─┬─ tickersFor ─ POST /api/prices ─ yahoo-finance2 ─�
                 │                                                  ├─ PriceSnapshot ─ valueWith ─ the page
                 └─ export .xlsx ─ Sheets ─ download .csv ─ parsePriceCsv ─┘
 
-                  tickersFor ─ POST /api/prices/history ─ yahoo-finance2 ─ PriceHistory ─ valueYears ─ /analytics
+                                                                                        ┌─ valueYears ─ /analytics
+                  tickersFor ─ POST /api/prices/history ─ yahoo-finance2 ─ PriceHistory ─┤
+                                                                                        └─ valueOverTime ─ CapitalChart
 ```
 
 `PriceSnapshot` gained three optional fields — `source`, `quotedAt`, and a
@@ -153,6 +156,44 @@ activity history per year. At the reference dataset's 2,947 rows over five
 years that is imperceptible; a twenty-year export would want the walk to emit
 year-end snapshots as it goes instead.
 
+## 5.1 The lead chart, month by month
+
+`CapitalChart` — the top chart on the timeline, the dashboard, the investment
+page and both account pages — has always drawn one line: capital deployed. Its
+own comment explained why a value line would have been invented. With a history
+loaded it isn't, so `valueOverTime` runs the same walk as `valueYears` at
+monthly resolution and the chart draws **both lines in one frame**: what went
+in, and what it came to. The gap between them is the gain, without a tab to
+switch or a second chart to compare against.
+
+The line that went in is **net deposits**, not capital deployed. Capital
+deployed answers "how much is in positions" and moves every time you trade;
+against a value that includes cash it would show a gap that changes when you
+buy. Net deposits — every `MoneyMovement` row, so a transfer between two of
+your own accounts cancels — only moves when money crosses the boundary of the
+portfolio, which makes the gap exactly what the accounts earned. `CapitalPoint`
+carries both, and the toggle beside the chart names the one it is drawing.
+
+Three things it does deliberately:
+
+- **Cash is in the value line.** It is the `value` figure `valueYears` already
+  emits — holdings at that month's close, anything unpriced at book cost, plus
+  the cash balance — so the chart and the analytics table cannot disagree.
+- **The last point is today's quote**, not last month's close, valued through
+  `valueWith` exactly as the investment page's Market value tile is. The line
+  therefore ends on the number that tile shows.
+- **Monthly values ride over daily capital points** via `connectNulls`. The
+  deposits line keeps its per-activity-day fidelity; the value line has an
+  anchor per month end and one for today.
+
+Two edges worth knowing. Yahoo's first monthly bar starts *after* the requested
+range opens, so the earliest month of any history has no close and that month
+falls back to book cost — which is why the chart only names a symbol as
+unpriced when the *latest* point still can't price it. And the walk now runs
+per month rather than per year, so the note above about a twenty-year export
+applies twelve times over; it is memoised per dataset and price history, and a
+five-year export is still imperceptible.
+
 ## 6. What a shippable version still needs
 
 1. **An editable ticker.** The sheet's best feature is that a wrong guess is a
@@ -164,11 +205,11 @@ year-end snapshots as it goes instead.
    expensive one, since Yahoo's chart endpoint takes a single symbol per
    request. A 44-holding portfolio is 45 requests, which the client queue runs
    four at a time in about ten seconds.
-3. **A production build check.** `pnpm build` was *not* run — it writes to
-   `.next`, which the running dev server owns. `serverExternalPackages` is set
-   for `yahoo-finance2` in `next.config.ts` because its dnt-generated entry
-   point pulls a `createRequire` polyfill that bundlers dislike, but that
-   reasoning is untested until someone builds it.
+3. ~~**A production build check.**~~ Done on `WSA-007`: `pnpm build` compiles
+   and prerenders clean, with both API routes served on demand.
+   `serverExternalPackages` is set for `yahoo-finance2` in `next.config.ts`
+   because its dnt-generated entry point pulls a `createRequire` polyfill that
+   bundlers dislike — that reasoning now holds up under a real build.
 4. **A decision about the README.** See §1.
 5. **Terms of use.** `yahoo-finance2` is unofficial and unaffiliated with Yahoo;
    its own README disclaims any guarantee of availability or consistency. That

@@ -85,7 +85,7 @@ export function InvestmentOverview() {
 				activities={dataset.activities}
 				currency={currency}
 				datasetEnd={dataset.dateRange.end}
-				label="Invested in the market"
+				label="Net deposits into the market"
 			/>
 
 			<HoldingsSummary currency={currency} report={report} />

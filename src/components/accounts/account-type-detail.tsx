@@ -92,7 +92,7 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 				activities={scoped}
 				currency={currency}
 				datasetEnd={dataset.dateRange.end}
-				label="Invested in this account type"
+				label="Net deposits into this account type"
 			/>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />

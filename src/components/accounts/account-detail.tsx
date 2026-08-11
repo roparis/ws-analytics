@@ -96,7 +96,7 @@ export function AccountDetail({
 				activities={scoped}
 				currency={currency}
 				datasetEnd={dataset.dateRange.end}
-				label="Invested in this account"
+				label="Net deposits into this account"
 			/>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />

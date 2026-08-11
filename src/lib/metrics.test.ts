@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	capitalOverTime,
 	computeKpis,
 	flowBreakdown,
 	groupByYear,
@@ -470,5 +471,85 @@ describe("groupByYear", () => {
 		expect(year.months.reduce((sum, month) => sum + month.kpis.count, 0)).toBe(
 			year.kpis.count,
 		);
+	});
+});
+
+describe("capitalOverTime", () => {
+	/** $1,000 deposited, $600 of it spent on shares, then a $40 dividend. */
+	const ACTIVITIES: Activity[] = [
+		makeActivity({
+			netCashAmount: 1000,
+			quantity: 1000,
+			transactionDate: "2026-01-05",
+		}),
+		makeActivity({
+			activitySubType: "BUY",
+			activityType: "Trade",
+			description: "VFV - Fund: Bought shares",
+			netCashAmount: -600,
+			quantity: 6,
+			symbol: "VFV",
+			transactionDate: "2026-01-06",
+			unitPrice: 100,
+		}),
+		makeActivity({
+			activitySubType: null,
+			activityType: "Dividend",
+			description: "VFV - Cash Dividend",
+			netCashAmount: 40,
+			quantity: 40,
+			symbol: "VFV",
+			transactionDate: "2026-02-10",
+		}),
+	];
+
+	it("runs deposits and capital deployed as separate totals", () => {
+		const points = capitalOverTime(ACTIVITIES);
+
+		// Buying shares moves money within the account: it is capital deployed,
+		// and it is not a deposit.
+		expect(points.map((point) => point.deposits)).toEqual([1000, 1000, 1000]);
+		expect(points.map((point) => point.invested)).toEqual([0, 600, 600]);
+		expect(points.at(-1)?.income).toBe(40);
+	});
+
+	it("nets a withdrawal back out of deposits", () => {
+		const points = capitalOverTime([
+			...ACTIVITIES,
+			makeActivity({
+				description: "Withdrawal",
+				netCashAmount: -250,
+				quantity: -250,
+				transactionDate: "2026-03-01",
+			}),
+		]);
+
+		expect(points.at(-1)?.deposits).toBe(750);
+	});
+
+	it("cancels a transfer between two of your own accounts", () => {
+		// Both legs are money movement, so across the portfolio they sum to zero —
+		// nothing arrived from outside.
+		const points = capitalOverTime([
+			...ACTIVITIES,
+			makeActivity({
+				activitySubType: "TRFOUT",
+				description: "Transfer out",
+				netCashAmount: -300,
+				quantity: -300,
+				transactionDate: "2026-03-01",
+			}),
+			makeActivity({
+				accountId: "TEST0002CAD",
+				accountType: "RRSP",
+				activitySubType: "TRFIN",
+				description: "Transfer in",
+				netCashAmount: 300,
+				quantity: 300,
+				transactionDate: "2026-03-01",
+			}),
+		]);
+
+		expect(points.at(-1)?.deposits).toBe(1000);
 	});
 });
