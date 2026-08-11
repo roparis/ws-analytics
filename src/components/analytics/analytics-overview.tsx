@@ -20,7 +20,7 @@ import {
 	yearAccountStats,
 	yearTotals,
 } from "@/lib/analytics";
-import { formatCurrency, formatDate } from "@/lib/metrics";
+import { formatCurrency, formatDate, isMarginAccount } from "@/lib/metrics";
 import { buildPositions } from "@/lib/positions";
 import { valueYears, withValuations } from "@/lib/price-history";
 import {
@@ -58,12 +58,25 @@ export function AnalyticsOverview() {
 		hydrateProjection();
 	}, [hydrateProjection]);
 
+	// Margin is left out of this page entirely. What it holds was bought with
+	// borrowed money, so its balance is a loan the reader is carrying rather than
+	// capital of theirs — compounding it forward at an equity return, or counting
+	// its gains as a year's earnings, would report the broker's money as their
+	// own. The filter is applied to the activities rather than to each table's
+	// output so every figure below is measured over the same rows: the per-type
+	// columns and the "All accounts" total still reconcile.
+	const activities = useMemo(
+		() =>
+			dataset?.activities.filter(
+				(activity) => !isMarginAccount(activity.accountType),
+			) ?? [],
+		[dataset],
+	);
+
 	const report = useMemo(
 		() =>
-			dataset
-				? buildPositions(dataset.activities, { sources: dataset.sources })
-				: null,
-		[dataset],
+			dataset ? buildPositions(activities, { sources: dataset.sources }) : null,
+		[activities, dataset],
 	);
 
 	// Real market value when a price snapshot has been imported, book cost plus
@@ -110,30 +123,27 @@ export function AnalyticsOverview() {
 	const valuations = useMemo(
 		() =>
 			dataset
-				? valueYears(dataset.activities, history, coverage)
+				? valueYears(activities, history, coverage)
 				: new Map<string, never>(),
-		[coverage, dataset, history],
+		[activities, coverage, dataset, history],
 	);
 
 	const totals = useMemo(
 		() =>
 			dataset && report
-				? withValuations(
-						yearTotals(dataset.activities, report, coverage),
-						valuations,
-					)
+				? withValuations(yearTotals(activities, report, coverage), valuations)
 				: [],
-		[coverage, dataset, report, valuations],
+		[activities, coverage, dataset, report, valuations],
 	);
 	const stats = useMemo(
 		() =>
 			dataset && report
 				? withValuations(
-						yearAccountStats(dataset.activities, report, coverage),
+						yearAccountStats(activities, report, coverage),
 						valuations,
 					)
 				: [],
-		[coverage, dataset, report, valuations],
+		[activities, coverage, dataset, report, valuations],
 	);
 
 	if (!dataset || !report) return null;
@@ -141,7 +151,9 @@ export function AnalyticsOverview() {
 	const currency = dataset.currencies[0] ?? "CAD";
 	const horizon = points.at(-1);
 	const depleted = depletionYear(points);
-	const accountTypes = [...dataset.accountTypes].sort();
+	const accountTypes = dataset.accountTypes
+		.filter((accountType) => !isMarginAccount(accountType))
+		.sort();
 
 	// The one sentence that says where the starting figures came from. It has to
 	// change with the answer: a projection off book cost and a projection off
@@ -153,8 +165,8 @@ export function AnalyticsOverview() {
 				valued.missingSymbols.length > 0
 					? ` ${valued.missingSymbols.join(", ")} had no price and ${valued.missingSymbols.length === 1 ? "is" : "are"} counted at what you paid.`
 					: ""
-			} Chequing-style accounts are left out: that balance is money waiting to be spent, not capital at work.`
-		: "Taken from what you paid for your holdings plus the cash beside them. Your export carries no prices, so anything you've gained since buying isn't in these figures — fetch live prices from the sidebar, or type over any of them with the value your account actually shows. Chequing-style accounts are left out: that balance is money waiting to be spent, not capital at work.";
+			} Chequing-style and margin accounts are left out: one holds money waiting to be spent, the other holdings bought with the broker's money — neither is capital of yours at work.`
+		: "Taken from what you paid for your holdings plus the cash beside them. Your export carries no prices, so anything you've gained since buying isn't in these figures — fetch live prices from the sidebar, or type over any of them with the value your account actually shows. Chequing-style and margin accounts are left out: one holds money waiting to be spent, the other holdings bought with the broker's money — neither is capital of yours at work.";
 
 	return (
 		<div className="flex flex-1 flex-col gap-6">
