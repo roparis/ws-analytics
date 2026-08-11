@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	type ContributionPlan,
 	contributionWeights,
 	depletionYear,
 	type ProjectionInputs,
 	projectSeries,
+	roomLimitYears,
+	usablePlans,
 } from "@/lib/projection";
 
 /** Every rate off, so a test can turn on exactly the one it is about. */
@@ -16,6 +19,18 @@ function makeInputs(
 		monthlyContribution: 0,
 		annualInflation: 0,
 		withdrawalRate: 0,
+		...overrides,
+	};
+}
+
+/** An unlimited monthly plan, so a test can add only the limit it is about. */
+function makePlan(overrides: Partial<ContributionPlan> = {}): ContributionPlan {
+	return {
+		amount: 0,
+		frequency: "monthly",
+		room: null,
+		roomIncrease: 0,
+		overflowTo: null,
 		...overrides,
 	};
 }
@@ -140,6 +155,38 @@ describe("projectSeries", () => {
 		expect(points[1].total).toBeGreaterThan(1200);
 	});
 
+	it("counts each account's own deposits, starting balance included", () => {
+		const points = projectSeries(
+			{ TFSA: 300, RRSP: 100 },
+			makeInputs({ years: 1, annualReturn: 0.07, monthlyContribution: 100 }),
+			AT,
+		);
+
+		// 75/25 of 100 a month for twelve months, on top of what each held.
+		expect(points[1].contributedByType).toEqual({
+			TFSA: 300 + 900,
+			RRSP: 100 + 300,
+		});
+		// The dashed line is the sum of the column beside it.
+		expect(points[1].contributed).toBeCloseTo(1600, 10);
+	});
+
+	it("keeps every point's deposits adding up to the contributed line", () => {
+		const points = projectSeries(
+			{ TFSA: 1000, RRSP: 2000 },
+			makeInputs({ years: 5, annualReturn: 0.06, monthlyContribution: 250 }),
+			AT,
+		);
+
+		for (const point of points) {
+			const sum = Object.values(point.contributedByType).reduce(
+				(total, value) => total + value,
+				0,
+			);
+			expect(point.contributed).toBeCloseTo(sum, 10);
+		}
+	});
+
 	it("keeps total equal to the sum of its account types", () => {
 		const points = projectSeries(
 			{ TFSA: 1000, RRSP: 2000, Margin: -100 },
@@ -256,5 +303,181 @@ describe("depletionYear", () => {
 		);
 
 		expect(depletionYear(points)).toBeNull();
+	});
+});
+
+describe("projectSeries with per-account plans", () => {
+	it("contributes a full year of periods, whatever the frequency", () => {
+		// The monthly step spreads a weekly or bi-weekly plan evenly, so what has
+		// to hold is the annual total: 52 weeks are 52, not 48.
+		const weekly = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({
+				years: 1,
+				plans: { TFSA: makePlan({ amount: 100, frequency: "weekly" }) },
+			}),
+			AT,
+		);
+		const biweekly = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({
+				years: 1,
+				plans: { TFSA: makePlan({ amount: 100, frequency: "biweekly" }) },
+			}),
+			AT,
+		);
+		const monthly = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({ years: 1, plans: { TFSA: makePlan({ amount: 100 }) } }),
+			AT,
+		);
+
+		expect(weekly[1].total).toBeCloseTo(5200, 10);
+		expect(biweekly[1].total).toBeCloseTo(2600, 10);
+		expect(monthly[1].total).toBeCloseTo(1200, 10);
+	});
+
+	it("ignores the global monthly contribution entirely", () => {
+		// The simple slider keeps its value while the advanced tab is open; it
+		// must not add itself on top of the per-account figures.
+		const points = projectSeries(
+			{ TFSA: 0, RRSP: 0 },
+			makeInputs({
+				years: 1,
+				monthlyContribution: 5000,
+				plans: { TFSA: makePlan({ amount: 100 }) },
+			}),
+			AT,
+		);
+
+		expect(points[1].byType.TFSA).toBeCloseTo(1200, 10);
+		expect(points[1].byType.RRSP).toBe(0);
+	});
+
+	it("funds only the accounts with a plan", () => {
+		const points = projectSeries(
+			{ TFSA: 0, RRSP: 500 },
+			makeInputs({ years: 1, plans: { TFSA: makePlan({ amount: 100 }) } }),
+			AT,
+		);
+
+		expect(points[1].byType.RRSP).toBe(500);
+	});
+
+	it("caps a contribution at the room left, carrying unused room forward", () => {
+		// The worked example: 24k of room today, 1k a month, 7k more room each
+		// year. Room outlasts the plan for three years and runs out in the fourth.
+		const points = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({
+				years: 5,
+				plans: {
+					TFSA: makePlan({ amount: 1000, room: 24_000, roomIncrease: 7000 }),
+				},
+			}),
+			AT,
+		);
+
+		expect(points.map((point) => point.roomLeft.TFSA)).toEqual([
+			24_000, 12_000, 7000, 2000, 0, 0,
+		]);
+		expect(points[3].refused.TFSA).toBe(0);
+		// Year four wants 12k against 9k of room.
+		expect(points[4].refused.TFSA).toBeCloseTo(3000, 10);
+		// Year five has 7k of new room against 12k wanted, so 5k more is refused.
+		expect(points[5].refused.TFSA).toBeCloseTo(8000, 10);
+		expect(roomLimitYears(points)).toEqual({ TFSA: 4 });
+	});
+
+	it("never caps an account with no room set", () => {
+		const points = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({ years: 30, plans: { TFSA: makePlan({ amount: 1000 }) } }),
+			AT,
+		);
+
+		expect(points[30].total).toBeCloseTo(360_000, 10);
+		expect(roomLimitYears(points)).toEqual({});
+		expect(points[30].unfunded).toBe(0);
+	});
+
+	it("spills what the room refuses into the account named", () => {
+		const points = projectSeries(
+			{ TFSA: 0, RRSP: 0 },
+			makeInputs({
+				years: 2,
+				plans: {
+					TFSA: makePlan({ amount: 1000, room: 6000, overflowTo: "RRSP" }),
+				},
+			}),
+			AT,
+		);
+
+		// A year and a half of deposits fits; the remaining eighteen months land
+		// in the RRSP instead.
+		expect(points[2].byType.TFSA).toBeCloseTo(6000, 10);
+		expect(points[2].byType.RRSP).toBeCloseTo(18_000, 10);
+		expect(points[2].total).toBeCloseTo(24_000, 10);
+		expect(points[2].unfunded).toBe(0);
+		// Every dollar still counts as money the reader put in, wherever it landed
+		// — and it counts against the account that took it, not the one that
+		// turned it away, so the deposit column matches the band above it.
+		expect(points[2].contributed).toBeCloseTo(24_000, 10);
+		expect(points[2].contributedByType.TFSA).toBeCloseTo(6000, 10);
+		expect(points[2].contributedByType.RRSP).toBeCloseTo(18_000, 10);
+	});
+
+	it("reports what nowhere could take rather than dropping it", () => {
+		const points = projectSeries(
+			{ TFSA: 0 },
+			makeInputs({
+				years: 2,
+				plans: { TFSA: makePlan({ amount: 1000, room: 6000 }) },
+			}),
+			AT,
+		);
+
+		expect(points[2].byType.TFSA).toBeCloseTo(6000, 10);
+		expect(points[2].unfunded).toBeCloseTo(18_000, 10);
+		expect(points[2].contributed).toBeCloseTo(6000, 10);
+	});
+
+	it("stops a pair of accounts pointing at each other from looping", () => {
+		const points = projectSeries(
+			{ TFSA: 0, RRSP: 0 },
+			makeInputs({
+				years: 1,
+				plans: {
+					TFSA: makePlan({ amount: 1000, room: 0, overflowTo: "RRSP" }),
+					RRSP: makePlan({ room: 0, overflowTo: "TFSA" }),
+				},
+			}),
+			AT,
+		);
+
+		expect(points[1].total).toBe(0);
+		expect(points[1].unfunded).toBeCloseTo(12_000, 10);
+	});
+});
+
+describe("usablePlans", () => {
+	it("drops a plan for an account type the dataset no longer has", () => {
+		const plans = { TFSA: makePlan({ amount: 100 }), LIRA: makePlan() };
+
+		expect(Object.keys(usablePlans(plans, { TFSA: 0 }))).toEqual(["TFSA"]);
+	});
+
+	it("points a departed overflow target at nothing", () => {
+		const plans = { TFSA: makePlan({ overflowTo: "LIRA" }) };
+
+		expect(usablePlans(plans, { TFSA: 0 }).TFSA.overflowTo).toBeNull();
+	});
+
+	it("keeps an overflow target the dataset still has", () => {
+		const plans = { TFSA: makePlan({ overflowTo: "RRSP" }) };
+
+		expect(usablePlans(plans, { TFSA: 0, RRSP: 0 }).TFSA.overflowTo).toBe(
+			"RRSP",
+		);
 	});
 });
