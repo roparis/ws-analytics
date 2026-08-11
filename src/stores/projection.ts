@@ -16,11 +16,12 @@ import type { ProjectionInputs } from "@/lib/projection";
 const KEY = "ws-analytics:projection";
 
 export const DEFAULT_INPUTS: ProjectionInputs = {
-	years: 20,
-	// Deliberately unambitious. This is the one number a reader is most likely
-	// to leave as they found it, so it should not be a number that flatters.
-	annualReturn: 0.06,
-	monthlyContribution: 500,
+	years: 30,
+	// This is the one number a reader is most likely to leave as they found it,
+	// so it is the long-run equity average the slider's own hint quotes rather
+	// than anything more optimistic — and that average is before fees.
+	annualReturn: 0.07,
+	monthlyContribution: 1000,
 	annualInflation: 0.02,
 	withdrawalRate: 0,
 };
