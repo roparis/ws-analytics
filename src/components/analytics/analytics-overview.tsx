@@ -6,7 +6,6 @@ import { YearAccountDetail } from "@/components/analytics/year-account-detail";
 import { YearAccountMatrix } from "@/components/analytics/year-account-matrix";
 import { buildSeries } from "@/components/charts/account-type-series";
 import { ProjectionChart } from "@/components/charts/projection-chart";
-import { LivePricesButton } from "@/components/investment/live-prices-button";
 import {
 	Card,
 	CardContent,
@@ -155,22 +154,13 @@ export function AnalyticsOverview() {
 					? ` ${valued.missingSymbols.join(", ")} had no price and ${valued.missingSymbols.length === 1 ? "is" : "are"} counted at what you paid.`
 					: ""
 			} Chequing-style accounts are left out: that balance is money waiting to be spent, not capital at work.`
-		: "Taken from what you paid for your holdings plus the cash beside them. Your export carries no prices, so anything you've gained since buying isn't in these figures — fetch live prices above, or type over any of them with the value your account actually shows. Chequing-style accounts are left out: that balance is money waiting to be spent, not capital at work.";
+		: "Taken from what you paid for your holdings plus the cash beside them. Your export carries no prices, so anything you've gained since buying isn't in these figures — fetch live prices from the sidebar, or type over any of them with the value your account actually shows. Chequing-style accounts are left out: that balance is money waiting to be spent, not capital at work.";
 
 	return (
 		<div className="flex flex-1 flex-col gap-6">
-			{/* The fetch lives here as well as on Investments: this is the page that
-			needs the years behind the prices, and sending someone to another page to
-			unlock half the columns on this one is a poor trade. */}
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<h1 className="font-semibold text-lg">Analytics</h1>
-				<LivePricesButton
-					currency={currency}
-					range={dataset.dateRange}
-					report={report}
-					variant={history ? "outline" : "default"}
-				/>
-			</div>
+			{/* The fetch that unlocks half the columns on this page is in the
+			sidebar, in reach from here and from every other page it feeds. */}
+			<h1 className="font-semibold text-lg">Analytics</h1>
 
 			<Card>
 				<CardHeader>

@@ -12,7 +12,6 @@ import { HistoryWarning } from "@/components/investment/history-warning";
 import { HoldingsSummary } from "@/components/investment/holdings-summary";
 import { HoldingsTable } from "@/components/investment/holdings-table";
 import { ImportPricesDialog } from "@/components/investment/import-prices-dialog";
-import { LivePricesButton } from "@/components/investment/live-prices-button";
 import { SymbolIncomeTable } from "@/components/investment/symbol-income-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/metrics";
@@ -67,15 +66,11 @@ export function InvestmentOverview() {
 				</div>
 				{/* Export and re-import are two halves of one loop, so they sit
 				together rather than the second hiding somewhere else. The live fetch
-				leads: it is the same answer without the loop. */}
+				is the same answer without the loop, and lives in the sidebar because
+				the prices it lands feed every page, not this one. */}
 				<div className="flex flex-wrap items-center gap-2">
 					<ImportPricesDialog currency={currency} report={report} />
 					<ExportSheetDialog {...exportProps} />
-					<LivePricesButton
-						currency={currency}
-						range={dataset.dateRange}
-						report={report}
-					/>
 				</div>
 			</div>
 
