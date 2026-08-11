@@ -246,7 +246,8 @@ export function yearAccountStats(
 ): YearAccountStat[] {
 	// The map carries the key's parts rather than relying on splitting it back
 	// apart: an account type is a free-form label that may contain anything,
-	// including whatever separator seemed safe here.
+	// including whatever separator seemed safe here. That separator is a NUL,
+	// written as an escape so this file stays text to git and grep.
 	interface Bucket {
 		year: string;
 		accountType: string;
@@ -258,7 +259,7 @@ export function yearAccountStats(
 		const year = activity.transactionDate.slice(0, 4);
 		if (!year) continue;
 
-		const key = `${year} ${activity.accountType}`;
+		const key = `${year}\u0000${activity.accountType}`;
 		const bucket = buckets.get(key);
 		if (bucket) {
 			bucket.rows.push(activity);
