@@ -442,6 +442,49 @@ describe("projectSeries with per-account plans", () => {
 		expect(points[2].contributed).toBeCloseTo(6000, 10);
 	});
 
+	it("carries a refusal down a chain of three targets", () => {
+		// The shape a reader actually builds: registered accounts in the order
+		// they want them filled, with a taxable account at the end to catch what
+		// is left. One account fills per year, and the fourth year's deposits
+		// have to cross three full accounts before they land anywhere.
+		const points = projectSeries(
+			{ TFSA: 0, FHSA: 0, RRSP: 0, "Non-registered": 0 },
+			makeInputs({
+				years: 4,
+				plans: {
+					TFSA: makePlan({ amount: 1000, room: 12_000, overflowTo: "FHSA" }),
+					FHSA: makePlan({ room: 12_000, overflowTo: "RRSP" }),
+					RRSP: makePlan({ room: 12_000, overflowTo: "Non-registered" }),
+				},
+			}),
+			AT,
+		);
+
+		const filled = points.map((point) =>
+			["TFSA", "FHSA", "RRSP", "Non-registered"].map((type) =>
+				Math.round(point.byType[type]),
+			),
+		);
+		expect(filled).toEqual([
+			[0, 0, 0, 0],
+			[12_000, 0, 0, 0],
+			[12_000, 12_000, 0, 0],
+			[12_000, 12_000, 12_000, 0],
+			[12_000, 12_000, 12_000, 12_000],
+		]);
+
+		// Nothing is lost on the way down the chain, and each account is credited
+		// with what it actually took.
+		expect(points[4].unfunded).toBe(0);
+		expect(points[4].contributed).toBeCloseTo(48_000, 10);
+		expect(points[4].contributedByType["Non-registered"]).toBeCloseTo(
+			12_000,
+			10,
+		);
+		// Each link reports the year its own room ran out, in chain order.
+		expect(roomLimitYears(points)).toEqual({ TFSA: 2, FHSA: 3, RRSP: 4 });
+	});
+
 	it("stops a pair of accounts pointing at each other from looping", () => {
 		const points = projectSeries(
 			{ TFSA: 0, RRSP: 0 },
