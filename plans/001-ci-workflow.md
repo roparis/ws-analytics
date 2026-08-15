@@ -344,7 +344,10 @@ instructed.
 Machine-checkable. ALL must hold:
 
 - [ ] `.github/workflows/ci.yml` exists and is valid YAML
-      (`python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml'))" && echo OK` → prints `OK`)
+      (`python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml'))" && echo OK` → prints `OK`.
+      Note: `pyyaml` is not part of this project's toolchain and may not be
+      installed — if the import fails, that is an environment gap, not a
+      failure of this criterion. Any YAML parser will do.)
 - [ ] `pnpm check` exits 0
 - [ ] `rm -rf .next next-env.d.ts && pnpm typecheck` exits 0 — **from clean**,
       which is the criterion the first version of this plan was missing

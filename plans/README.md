@@ -15,7 +15,7 @@ otherwise.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | TODO |
+| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (awaiting merge) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | TODO |
@@ -42,12 +42,24 @@ document, not a feature. They must not modify production code.
 
 ## Execution log
 
-- **001 — attempt 1 STOPPED, plan revised, back to TODO.** The executor
-  correctly refused to proceed past a failing `pnpm typecheck` and surfaced the
-  generated-types trap documented in the Baseline section below. The plan's
-  claim that all gates passed had been measured in a dirty working directory.
-  001 now carries a Step 2 that makes `typecheck` self-provisioning, and a done
-  criterion that verifies it **from clean**. Ready to re-dispatch.
+- **001 — attempt 1 STOPPED, plan revised.** The executor correctly refused to
+  proceed past a failing `pnpm typecheck` and surfaced the generated-types trap
+  documented in the Baseline section below. The plan's claim that all gates
+  passed had been measured in a dirty working directory. 001 gained a Step 2
+  making `typecheck` self-provisioning, and a done criterion that verifies it
+  **from clean**.
+- **001 — attempt 2 COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done
+  criterion re-run independently by the reviewer from a clean state: YAML valid,
+  `typecheck` 0 from clean, `check` 0, `test` 0 (13 files / 228), `build` 0,
+  `verify` 0 from clean. Scope clean — only `.github/workflows/ci.yml` (new) and
+  two script lines in `package.json`; nothing under `src/`, `biome.jsonc`
+  untouched, no dependency moved.
+  Commit `7034784` on branch `advisor/001-ci-workflow`, cut from `1d09a07`.
+  **Not merged and not pushed** — that is the maintainer's decision.
+  *Unproven until it runs*: the workflow has never executed on GitHub. Local
+  verification simulates what CI does but cannot confirm
+  `pnpm/action-setup@v4` resolving the `packageManager` field, or the
+  `cache: pnpm` ordering. The first real CI run on a PR is the end-to-end proof.
 
 ## Dependency notes
 
