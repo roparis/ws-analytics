@@ -223,7 +223,7 @@ rendered only when something is below `high` confidence:
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 tests pass (plus 002's, if landed) |
+| Tests | `pnpm test` | exit 0, 228 tests pass (plus 002's, if landed) |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Build | `pnpm build` | exit 0 |
 | Run just parser tests | `pnpm test wealthsimple` | all pass |

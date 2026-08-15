@@ -157,7 +157,7 @@ imports in the app.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 pass |
+| Tests | `pnpm test` | exit 0, 228 pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings, or 0 if `plans/016` landed) |
 | Build | `pnpm build` | exit 0 |
 | Dev server | `pnpm dev` | serves on :3000 |
@@ -197,7 +197,7 @@ imports in the app.
 ### Step 1: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 227 passed (227)`.
+`Tests 228 passed (228)`.
 
 **Verify**: `pnpm build` → exit 0. Note the build output — the route sizes it
 prints are your before-measurement for Step 4.
@@ -296,7 +296,7 @@ Verification is therefore Step 3 (the bundle actually split) and Step 4 (the
 export actually still works). Both must be reported with what you observed, not
 merely ticked.
 
-The 227 existing tests must keep passing — they do not touch this component, so
+The 228 existing tests must keep passing — they do not touch this component, so
 any movement means something unexpected happened.
 
 ## Done criteria
@@ -304,7 +304,7 @@ any movement means something unexpected happened.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests pass
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass
 - [ ] `pnpm check` exits 0 with no new warnings
 - [ ] `pnpm build` exits 0
 - [ ] `grep -c "from \"@/lib/pdf\"" src/components/pdf-export-button.tsx`

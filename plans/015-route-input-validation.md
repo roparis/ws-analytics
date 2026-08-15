@@ -236,7 +236,7 @@ is what makes it the right home for the shared validator.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline + new |
+| Tests | `pnpm test` | exit 0, 228 baseline + new |
 | One file | `pnpm test live-prices` | all pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Build | `pnpm build` | exit 0 |
@@ -285,7 +285,7 @@ is what makes it the right home for the shared validator.
 ### Step 1: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 227 passed (227)`. If the count differs, the tree has drifted — STOP.
+`Tests 228 passed (228)`. If the count differs, the tree has drifted — STOP.
 
 ### Step 2: Extract the shared validator into `src/lib/live-prices.ts`
 
@@ -427,7 +427,7 @@ know they test the new constraint rather than a pre-existing one.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests pass, plus at least 13 new
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 13 new
       cases
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`
@@ -459,7 +459,7 @@ Stop and report back (do not improvise) if:
 - You find yourself trying to suppress `yahoo-finance2`'s internal
   `console.error(url)`. It is not routed through the configurable logger and
   cannot be suppressed that way — report it rather than attempting a workaround.
-- Any of the 227 pre-existing tests fails.
+- Any of the 228 pre-existing tests fails.
 
 ## Maintenance notes
 

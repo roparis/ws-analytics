@@ -197,7 +197,7 @@ From `docs/yahoo-pricing-poc.md`, and from the code:
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline |
+| Tests | `pnpm test` | exit 0, 228 baseline |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Build | `pnpm build` | exit 0 |
 | Exercise the route | see `docs/yahoo-pricing-poc.md` §7 for a working `curl` | JSON response |
@@ -236,7 +236,7 @@ From `docs/yahoo-pricing-poc.md`, and from the code:
 ### Step 1: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 227 passed (227)`. If the count differs, the tree has drifted — STOP.
+`Tests 228 passed (228)`. If the count differs, the tree has drifted — STOP.
 
 ### Step 2: Degrade the FX failure per-symbol instead of fatally
 
@@ -347,7 +347,7 @@ temporary edit to test it, **revert it before committing** and confirm with
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests still pass
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests still pass
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`
 - [ ] `pnpm build` exits 0
@@ -371,7 +371,7 @@ Stop and report back (do not improvise) if:
   portfolio. That changes the shape of the fix and needs a decision.
 - You conclude the fix requires raising the upstream concurrency. It does not,
   and raising it is explicitly forbidden.
-- Any of the 227 pre-existing tests fails.
+- Any of the 228 pre-existing tests fails.
 - `pnpm build` fails.
 - You find that closed positions were excluded from history **deliberately**,
   with a comment or doc line saying so. Report the citation — this plan's premise

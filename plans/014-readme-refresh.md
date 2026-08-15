@@ -144,7 +144,7 @@ Build the feature list from this, not from the existing one.
 |---|---|---|
 | Confirm a claim | `grep -rni "<term>" src/ package.json` | as stated below |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
-| Tests | `pnpm test` | exit 0, 227 pass |
+| Tests | `pnpm test` | exit 0, 228 pass |
 
 ## Scope
 
@@ -274,7 +274,7 @@ Development and Contributing sections were accurate at the time of writing —
 confirm they still are, and fix anything you find, but do not restructure the
 document. This is a correction, not a rewrite.
 
-**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 227 tests
+**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 228 tests
 pass. (This plan changes no code; movement means something is wrong.)
 
 **Verify**: `git status --short` → only `README.md`.
@@ -305,7 +305,7 @@ Machine-checkable. ALL must hold:
       `grep -ci "merge" README.md` each return at least 1
 - [ ] The privacy statement names ticker symbols as the only thing that crosses
       the wire, and is not scoped to a branch
-- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 227 tests pass
+- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 228 tests pass
 - [ ] `git status --short` lists only `README.md`
 - [ ] `plans/README.md` status row for 014 updated
 

@@ -147,7 +147,7 @@ Two further facts to confirm while working, rather than assume:
 |---|---|---|
 | Install | `pnpm install` | exit 0, lockfile updated |
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline + new |
+| Tests | `pnpm test` | exit 0, 228 baseline + new |
 | Lint | `pnpm check` | **exit 0 with 0 warnings** after Step 3 |
 | Build | `pnpm build` | exit 0 |
 
@@ -191,7 +191,7 @@ Two further facts to confirm while working, rather than assume:
 
 ### Step 1: Record the baseline
 
-**Verify**: `pnpm typecheck && pnpm test` → exit 0, `Tests 227 passed (227)`.
+**Verify**: `pnpm typecheck && pnpm test` → exit 0, `Tests 228 passed (228)`.
 
 **Verify**: `pnpm check` → exit 0, **5 warnings**, all in
 `src/lib/google-sheet.ts`. Note the count; Step 3 takes it to 0.
@@ -309,7 +309,7 @@ No new tests for Steps 2 and 3: `pnpm build` proves the dependency move, and
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests pass, plus at least 4 new
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 4 new
       projection cases
 - [ ] **`pnpm check` exits 0 with 0 warnings**
 - [ ] `pnpm build` exits 0

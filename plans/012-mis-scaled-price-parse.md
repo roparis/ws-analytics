@@ -112,7 +112,7 @@ correct failure mode, and it is where an unreadable price should go.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline + new |
+| Tests | `pnpm test` | exit 0, 228 baseline + new |
 | One file | `pnpm test price-snapshot` | all pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 
@@ -147,7 +147,7 @@ correct failure mode, and it is where an unreadable price should go.
 ### Step 1: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 227 passed (227)`. If the count differs, the tree has drifted — STOP.
+`Tests 228 passed (228)`. If the count differs, the tree has drifted — STOP.
 
 ### Step 2: Write the failing test first
 
@@ -197,7 +197,7 @@ Add the remaining cases from the table in Step 3 plus the ones in the Test plan
 below, so the rule is pinned in both directions — a decimal comma must still
 work, and a group separator must not be eaten.
 
-**Verify**: `pnpm test` → exit 0, all 227 pre-existing plus your new cases.
+**Verify**: `pnpm test` → exit 0, all 228 pre-existing plus your new cases.
 
 ### Step 5: Full verification
 
@@ -236,7 +236,7 @@ these are already covered, extend rather than duplicate.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests pass, plus at least 6 new
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 6 new
       cases
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`

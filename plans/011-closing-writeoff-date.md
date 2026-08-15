@@ -191,7 +191,7 @@ untouched. It is your safety net.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline + new |
+| Tests | `pnpm test` | exit 0, 228 baseline + new |
 | One file | `pnpm test positions` | all pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 
@@ -227,7 +227,7 @@ untouched. It is your safety net.
 ### Step 1: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 227 passed (227)`. If the count differs, the tree has drifted — STOP.
+`Tests 228 passed (228)`. If the count differs, the tree has drifted — STOP.
 
 ### Step 2: Track the last event date of any kind
 
@@ -296,7 +296,7 @@ STOP and report rather than choosing for yourself — the alternative (keep the
 event, attribute it to `firstTradeDate`) has different tradeoffs and is the
 maintainer's call.
 
-**Verify**: `pnpm test` → exit 0, all 227 pre-existing tests pass.
+**Verify**: `pnpm test` → exit 0, all 228 pre-existing tests pass.
 
 ### Step 5: Full verification
 
@@ -331,7 +331,7 @@ Keep every fixture amount small, round and obviously invented.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests pass, plus at least 4 new
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 4 new
       cases
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`
@@ -355,7 +355,7 @@ Stop and report back (do not improvise) if:
 - Step 4's empty-date case turns out to be reachable in a way that breaks the
   realisation-sum invariant. Report the reproduction; the choice between
   dropping the event and re-attributing it is the maintainer's.
-- Any of the 227 pre-existing tests fails.
+- Any of the 228 pre-existing tests fails.
 - You find yourself widening `Position.lastTradeDate`'s meaning, or touching the
   sort at `positions.ts:740` or the roll-up at `:839-842`.
 - You conclude the fix belongs in `src/lib/analytics.ts`. It does not — the date
