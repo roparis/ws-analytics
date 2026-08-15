@@ -1,4 +1,10 @@
-import html2canvas from "html2canvas";
+// `html2canvas-pro` rather than `html2canvas`: the original's colour parser
+// predates the CSS Color 4 functions and throws on the first one it meets
+// ("unsupported color function"). Our theme tokens in `globals.css` are all
+// `oklch()`, which Chrome hands back to the parser as `lab()`, so every export
+// failed before it drew a pixel. The fork is API-compatible and understands
+// `lab`/`lch`/`oklab`/`oklch`.
+import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 
 export async function exportElementToPdf(
