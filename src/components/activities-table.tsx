@@ -2,6 +2,13 @@
 
 import { useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/lib/wealthsimple";
@@ -9,11 +16,18 @@ import type { Activity } from "@/lib/wealthsimple";
 interface ActivitiesTableProps {
 	activities: Activity[];
 	currency: string;
+	/**
+	 * Drop the surrounding card, for callers that already provide one — the
+	 * dialog is its own surface, and nesting a card inside it would scroll its
+	 * header away with the rows.
+	 */
+	bare?: boolean;
 }
 
 export function ActivitiesTable({
 	activities,
 	currency,
+	bare = false,
 }: ActivitiesTableProps) {
 	const columns = useMemo<DataTableColumn<Activity>[]>(
 		() => [
@@ -89,7 +103,7 @@ export function ActivitiesTable({
 		[currency],
 	);
 
-	return (
+	const table = (
 		<DataTable
 			columns={columns}
 			emptyMessage="No activities match the current filters."
@@ -102,5 +116,20 @@ export function ActivitiesTable({
 			}
 			rows={activities}
 		/>
+	);
+
+	if (bare) return table;
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Every activity</CardTitle>
+				<CardDescription>
+					Each row of the export in scope, newest first. Sort any column; more
+					rows load as you scroll.
+				</CardDescription>
+			</CardHeader>
+			<CardContent>{table}</CardContent>
+		</Card>
 	);
 }

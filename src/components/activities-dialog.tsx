@@ -361,7 +361,7 @@ export function ActivitiesDialog({
 				{/* The table paginates internally; this scrolls the dialog body so a
 				long description column can't push the filter bar off-screen. */}
 				<div className="min-h-0 flex-1 overflow-y-auto">
-					<ActivitiesTable activities={filtered} currency={currency} />
+					<ActivitiesTable activities={filtered} bare currency={currency} />
 				</div>
 			</DialogContent>
 		</Dialog>
