@@ -106,6 +106,18 @@ export interface PriceHistoryResponse {
  */
 export const MAX_SYMBOLS = 100;
 
+/**
+ * The history route's own, lower ceiling.
+ *
+ * Unlike the quote route, history costs one upstream Yahoo request *per
+ * symbol* plus one for FX — at `MAX_SYMBOLS` that's up to 101 upstream
+ * requests for a single inbound one. `tickersFor` emits one entry per
+ * distinct held symbol, and the worked example in
+ * `docs/yahoo-pricing-poc.md` is a 44-holding portfolio, so 60 leaves real
+ * portfolios untouched while roughly halving the worst-case amplification.
+ */
+export const MAX_HISTORY_SYMBOLS = 60;
+
 /** Where the browser sends its list. */
 export const PRICES_ENDPOINT = "/api/prices";
 
@@ -196,10 +208,15 @@ export async function fetchPriceHistory(
  * copies of these checks, including the ticker pattern, which is exactly the
  * kind of thing that drifts silently. `noun` only varies the error wording
  * ("quote" vs "chart"), which is the sole difference the copies actually had.
+ *
+ * `maxSymbols` defaults to `MAX_SYMBOLS` but lets the history route pass its
+ * own, lower `MAX_HISTORY_SYMBOLS` — the two routes' amplification differs by
+ * two orders of magnitude, so they don't share one ceiling.
  */
 export function readRequestSymbols(
 	symbols: unknown,
 	noun: string,
+	maxSymbols: number = MAX_SYMBOLS,
 ): PriceRequestSymbol[] {
 	if (!Array.isArray(symbols)) {
 		throw new Error("Expected a JSON body with a `symbols` array.");
@@ -207,8 +224,8 @@ export function readRequestSymbols(
 	if (symbols.length === 0) {
 		throw new Error(`No symbols to ${noun}.`);
 	}
-	if (symbols.length > MAX_SYMBOLS) {
-		throw new Error(`At most ${MAX_SYMBOLS} symbols per request.`);
+	if (symbols.length > maxSymbols) {
+		throw new Error(`At most ${maxSymbols} symbols per request.`);
 	}
 
 	return symbols.map((entry) => {

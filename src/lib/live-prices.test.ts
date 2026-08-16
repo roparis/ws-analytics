@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	type LivePriceQuote,
 	type LivePriceResponse,
+	MAX_HISTORY_SYMBOLS,
 	MAX_SYMBOLS,
 	readRequestSymbols,
 	snapshotFromLivePrices,
@@ -203,5 +204,34 @@ describe("readRequestSymbols", () => {
 		const shapes = ["VFV.TO", "CTC-A.TO", "BRK-B", "BTC-CAD", "USDCAD=X"];
 		const symbols = shapes.map((ticker) => ({ symbol: ticker, ticker }));
 		expect(readRequestSymbols(symbols, "quote")).toHaveLength(shapes.length);
+	});
+
+	it("still accepts up to MAX_SYMBOLS when no override is passed", () => {
+		const symbols = Array.from({ length: MAX_SYMBOLS }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(readRequestSymbols(symbols, "quote")).toHaveLength(MAX_SYMBOLS);
+	});
+
+	it("rejects more than a passed-in maxSymbols, even under MAX_SYMBOLS", () => {
+		const symbols = Array.from({ length: MAX_HISTORY_SYMBOLS + 1 }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(symbols.length).toBeLessThan(MAX_SYMBOLS);
+		expect(() =>
+			readRequestSymbols(symbols, "chart", MAX_HISTORY_SYMBOLS),
+		).toThrow(new RegExp(String(MAX_HISTORY_SYMBOLS)));
+	});
+
+	it("accepts exactly a passed-in maxSymbols — the boundary is inclusive", () => {
+		const symbols = Array.from({ length: MAX_HISTORY_SYMBOLS }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(
+			readRequestSymbols(symbols, "chart", MAX_HISTORY_SYMBOLS),
+		).toHaveLength(MAX_HISTORY_SYMBOLS);
 	});
 });

@@ -1,6 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import {
 	type LivePriceMiss,
+	MAX_HISTORY_SYMBOLS,
 	type PriceHistoryRequest,
 	type PriceHistoryResponse,
 	type PriceHistorySeries,
@@ -211,7 +212,11 @@ function readRequest(body: unknown): {
 	to: string;
 } {
 	const input = body as PriceHistoryRequest | null;
-	const symbols = readRequestSymbols(input?.symbols, "chart");
+	const symbols = readRequestSymbols(
+		input?.symbols,
+		"chart",
+		MAX_HISTORY_SYMBOLS,
+	);
 
 	const from = isoDate(input?.from);
 	const to = isoDate(input?.to);
