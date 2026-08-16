@@ -1,3 +1,5 @@
+import { toLocalIso } from "@/lib/calendar-date";
+
 /**
  * Clipboard and download helpers for the Google Sheets export. Touches the DOM,
  * so it lives beside `pdf.ts` rather than in a pure module.
@@ -61,12 +63,8 @@ export function downloadBlob(
  * on their file.
  */
 export function todayStamp(now = new Date()): string {
-	const pad = (value: number) => String(value).padStart(2, "0");
-	return [
-		pad(now.getMonth() + 1),
-		pad(now.getDate()),
-		String(now.getFullYear()).slice(-2),
-	].join("-");
+	const [year, month, day] = toLocalIso(now).split("-");
+	return [month, day, year.slice(2)].join("-");
 }
 
 /**
