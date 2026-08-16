@@ -263,9 +263,13 @@ Also update the early return above the loop, `src/lib/storage.ts:156`, which
 currently reads `if (stored.length === 0) return { sources: [], reparsed: 0 };`
 — add `failed: []`.
 
-**Verify**: `pnpm typecheck` → fails only in `src/stores/dataset.ts` (the
-destructuring at line 45 does not yet know about `failed`). Any other file in
-the error list is a STOP condition.
+**Verify**: `pnpm typecheck` → **exit 0**. Widening a return type is not a
+breaking change for callers: `dataset.ts` destructures `{ sources, reparsed }`
+and TypeScript permits destructuring a subset of a wider object, so it keeps
+compiling until Step 3 adds `failed`. (An earlier revision of this plan
+predicted a failure here — it was wrong, and the executor who found that was
+right to say so.) Any error naming a file other than the two in scope is a STOP
+condition.
 
 ### Step 2: Make the write-back non-destructive
 
@@ -437,7 +441,10 @@ Machine-checkable. ALL must hold:
 
 Stop and report back (do not improvise) if:
 
-- Step 1's typecheck failure names any file other than `src/stores/dataset.ts`.
+- Step 1's typecheck reports an error naming any file other than the two in
+  scope. (Note: on a fresh worktree, `PageProps`/`LayoutProps` errors are the
+  missing Next.js generated types, cleared by `pnpm exec next typegen` — that is
+  environment setup, not a STOP condition.)
 - No `<Toaster />` is mounted anywhere (Step 4). The user-facing report needs a
   surface, and choosing a different one is a design decision, not an
   improvisation.

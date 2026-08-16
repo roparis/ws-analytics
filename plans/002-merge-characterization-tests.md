@@ -227,7 +227,7 @@ House conventions visible there and required here:
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Run just this file | `pnpm test merge` | all pass |
-| Full suite | `pnpm test` | exit 0, 227 existing + your new tests |
+| Full suite | `pnpm test` | exit 0, 228 existing + your new tests |
 | Typecheck | `pnpm typecheck` | exit 0 |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings are fine) |
 
@@ -382,7 +382,7 @@ kept.
 
 ### Step 8: Run the full suite and lint
 
-**Verify**: `pnpm test` → exit 0, 227 pre-existing tests still pass plus your new
+**Verify**: `pnpm test` → exit 0, 228 pre-existing tests still pass plus your new
 ones. **If any pre-existing test now fails, STOP** — you have modified something
 outside scope.
 
@@ -417,7 +417,7 @@ Machine-checkable. ALL must hold:
 
 - [ ] `src/lib/merge.test.ts` exists
 - [ ] `pnpm test merge` exits 0 with at least 9 tests passing
-- [ ] `pnpm test` exits 0; total test count is 227 + (your new tests)
+- [ ] `pnpm test` exits 0; total test count is 228 + (your new tests)
 - [ ] `pnpm typecheck` exits 0
 - [ ] `pnpm check` exits 0 with no new warnings (still exactly 5, all in
       `src/lib/google-sheet.ts`)

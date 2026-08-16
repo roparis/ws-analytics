@@ -131,7 +131,7 @@ stops someone inventing a portfolio value.
   so two surfaces cannot disagree. See `metrics.ts:836-837`, `:182-184`, and
   `price-history.ts:19-22`.
 - **Tests**: colocated as `src/lib/*.test.ts`, `environment: "node"`, 13 files /
-  227 tests in ~260ms. **No mocks, no fake timers anywhere** —
+  228 tests in ~260ms. **No mocks, no fake timers anywhere** —
   `grep "vi.mock\|vi.fn\|vi.spyOn\|useFakeTimers"` across all 13 files returns
   zero hits. Injectable parameters (`now`, `asOf`) are the seam instead.
 - **Deliberately not tested**: components/JSX (no jsdom — see
@@ -179,7 +179,7 @@ Tabs for indentation, everywhere, enforced by Biome.
 |---|---|---|
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 pass |
+| Tests | `pnpm test` | exit 0, 228 pass |
 
 ## Scope
 
@@ -270,7 +270,7 @@ every `file:line` you cite exists.
 
 ### Step 4: Confirm nothing else moved
 
-**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 227 tests
+**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 228 tests
 pass. (This plan changes no code, so any movement means something is wrong.)
 
 **Verify**: `git status --short` → only `AGENTS.md`.
@@ -297,7 +297,7 @@ Machine-checkable. ALL must hold:
 - [ ] `grep -c "wealthsimple-csv-format.md" AGENTS.md` is at least 1
 - [ ] `grep -c "yahoo-pricing-poc.md" AGENTS.md` is at least 1
 - [ ] All eight rules from the table are present
-- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 227 tests pass
+- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 228 tests pass
 - [ ] `git status --short` lists only `AGENTS.md`
 - [ ] `plans/README.md` status row for 013 updated
 

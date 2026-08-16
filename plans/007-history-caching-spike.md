@@ -201,8 +201,14 @@ The document must answer each of these explicitly.
      retaining which symbols were looked up is precisely the privacy question
      `docs/yahoo-pricing-poc.md` §1 leaves open ("whoever runs the deployment can
      see which symbols were looked up").
-   - The hosting decision is **unresolved**. A design that only works when
-     hosted is premature.
+   - **The hosting decision is resolved in practice**: this app has been
+     serving production at `https://ws-analytics.vercel.app` since 2026-08-11
+     (12 production deployments). An earlier revision of this plan called it
+     unresolved and told you to prefer client-side on that basis. That reason is
+     gone. Client-side may still win on privacy grounds — a shared server-side
+     cache means the deployment retains which symbols were looked up, which
+     `docs/yahoo-pricing-poc.md` §1 names as the cost of the server path — but
+     argue it from privacy and effort, not from "hosting is undecided".
 
    State a recommendation with an order (e.g. "client-side first, server-side
    only if hosting is decided").

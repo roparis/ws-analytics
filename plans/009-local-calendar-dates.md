@@ -243,7 +243,7 @@ DST-free.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 227 baseline + new |
+| Tests | `pnpm test` | exit 0, 228 baseline + new |
 | One file | `pnpm test calendar-date` | all pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Build | `pnpm build` | exit 0 |
@@ -302,7 +302,7 @@ DST-free.
 ### Step 0: Record the baseline
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Test Files 13 passed (13)` and `Tests 227 passed (227)`, and `pnpm check`
+`Test Files 13 passed (13)` and `Tests 228 passed (228)`, and `pnpm check`
 printing exactly 5 warnings, all in `src/lib/google-sheet.ts`.
 
 If the counts differ, the tree has drifted from this plan — STOP.
@@ -355,7 +355,7 @@ plan below.
 **Verify**: `pnpm test calendar-date` → all new tests pass.
 
 **Verify**: `pnpm typecheck` → exit 0. Nothing imports the module yet, so the
-rest of the suite cannot have moved: `pnpm test` still shows 227 + your new
+rest of the suite cannot have moved: `pnpm test` still shows 228 + your new
 count.
 
 ### Step 2: Pin the timezone, and prove the pin is live
@@ -371,7 +371,7 @@ Add to `vitest.config.mts`, inside `test`:
 		env: { TZ: "America/Toronto" },
 ```
 
-**Verify**: `pnpm test` → still 227 baseline tests passing plus yours. The pin
+**Verify**: `pnpm test` → still 228 baseline tests passing plus yours. The pin
 should move nothing yet. (Checked during planning: `market-month.test.ts` passes
 explicit named zones, `clipboard.test.ts` builds from local components, and
 `projection.test.ts` is `Date.UTC` in and `getUTC*` out — all timezone-independent.)
@@ -592,7 +592,7 @@ the clamp cases. Say so, rather than leaving a reader wondering.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 227 pre-existing tests still pass, plus the new
+- [ ] `pnpm test` exits 0; all 228 pre-existing tests still pass, plus the new
       `calendar-date` and `date-range` suites
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`
@@ -618,7 +618,7 @@ Stop and report back (do not improvise) if:
   would ship a fix whose tests could never have caught the bug.
 - **Step 6b's clamp cases pass instead of failing.** They should fail in every
   timezone; passing means the move in 6a changed behaviour.
-- Any of the 227 pre-existing tests fails at any point.
+- Any of the 228 pre-existing tests fails at any point.
 - `src/lib/clipboard.test.ts` needs modification to keep passing after Step 7.
   Revert Step 7 and report.
 - Adding the TZ pin in Step 2 breaks a test other than the three being rewritten.

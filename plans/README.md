@@ -15,11 +15,11 @@ otherwise.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | TODO |
+| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (awaiting merge) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
-| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | TODO |
-| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | TODO |
+| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (awaiting merge) |
+| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (awaiting merge) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
@@ -30,6 +30,7 @@ otherwise.
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
+| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | TODO |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
 
@@ -40,6 +41,102 @@ approach abandoned).
 Plans 006 and 007 are **design spikes**. Their deliverable is a written design
 document, not a feature. They must not modify production code.
 
+## Execution log
+
+- **001 — attempt 1 STOPPED, plan revised.** The executor correctly refused to
+  proceed past a failing `pnpm typecheck` and surfaced the generated-types trap
+  documented in the Baseline section below. The plan's claim that all gates
+  passed had been measured in a dirty working directory. 001 gained a Step 2
+  making `typecheck` self-provisioning, and a done criterion that verifies it
+  **from clean**.
+- **001 — attempt 2 COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done
+  criterion re-run independently by the reviewer from a clean state: YAML valid,
+  `typecheck` 0 from clean, `check` 0, `test` 0 (13 files / 228), `build` 0,
+  `verify` 0 from clean. Scope clean — only `.github/workflows/ci.yml` (new) and
+  two script lines in `package.json`; nothing under `src/`, `biome.jsonc`
+  untouched, no dependency moved.
+  Commit `7034784` on branch `advisor/001-ci-workflow`, cut from `1d09a07`.
+  **Not merged and not pushed** — that is the maintainer's decision.
+  *Unproven until it runs*: the workflow has never executed on GitHub. Local
+  verification simulates what CI does but cannot confirm
+  `pnpm/action-setup@v4` resolving the `packageManager` field, or the
+  `cache: pnpm` ordering. The first real CI run on a PR is the end-to-end proof.
+- **004 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done criterion
+  re-run independently by the reviewer: `typecheck` 0, `check` 0 (still exactly
+  5 warnings), `test` 0 (13 files / 228), `build` 0. Scope clean — only
+  `src/lib/storage.ts` and `src/stores/dataset.ts`; `PARSER_VERSION` untouched,
+  nothing under `plans/`. Verified by reading the diff, not the report:
+  `updateSources` transacts over `SOURCES` only, has **no** `store.clear()`, and
+  never writes `ORDER_KEY`; `hydrate` no longer calls `saveSources` (the one
+  remaining mention inside it is the explanatory comment), while `addSources`
+  and `removeSource` still do, correctly.
+  Commit `38cfca1` on branch `advisor/004-preserve-unparseable-sources`, cut
+  from `1d09a07`. **Not merged and not pushed.**
+  *Plan defect found by the executor*: Step 1 predicted `pnpm typecheck` would
+  fail until Step 3. It does not — TypeScript permits destructuring a subset of
+  a widened return type. The executor flagged the mismatch rather than forcing
+  the predicted result; Step 1 and its STOP condition have been corrected.
+  *Not verified*: the runtime behaviour. `src/lib/storage.ts` talks to IndexedDB,
+  which does not exist under the suite's node environment, so the fix is
+  established structurally. The end-to-end proof — bump `PARSER_VERSION`, break
+  one file, confirm it survives and comes back — needs a browser and a real
+  export.
+
+- **005 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done criterion
+  re-run independently: `typecheck` 0, `check` 0 (still exactly 5 warnings),
+  `test` 0 (13 files / 228), `build` 0. Scope clean — only
+  `src/components/data-source-card.tsx` and `src/stores/dataset.ts`.
+  Verified by reading the diff: the skeleton guard sits before the
+  `!dataset` branch and covers **both** the compact and full renders; the merged
+  order is `[...restored, ...state.sources]` (stored first, raced last — the
+  order `addSources` would have produced), not the reverse; the race path
+  re-persists `get().sources`, the merged list, not the list read from disk; and
+  plan 004's `failed` handling and `updateSources` call both survived intact.
+  Commit `a4a1c9e` on branch `advisor/005-gate-uploader-on-hydration`,
+  **stacked on `advisor/004-preserve-unparseable-sources`** (`38cfca1` confirmed
+  as an ancestor). **Not merged and not pushed.**
+  *Authoring lesson*: the dispatch carried a done criterion asserting
+  `grep -c "updateSources" src/stores/dataset.ts` returns 2. It returns 4 — one
+  import, one call, and two mentions of the symbol *in prose comments* that the
+  reconciled step itself introduced. The executor followed the specified code
+  and flagged the stale count rather than deleting a comment to satisfy the
+  grep. **A `grep -c` on a bare symbol name counts comments too**; future plans
+  should match a call shape (`persist(updateSources(`) rather than a name.
+  *Not verified*: the race itself. `hydrate` reads IndexedDB, absent from the
+  node test environment, so this is established structurally. Reproducing it
+  needs a browser, a slow read, and a drop inside the window.
+
+## ⚠️ This app is in production — a premise several plans got wrong
+
+Discovered 2026-08-16 while opening PRs: `https://ws-analytics.vercel.app` is
+this repository's homepage and has served **12 production deployments** since
+2026-08-11, running this exact build — both API routes included.
+
+The original audit and several plans reasoned as though the hosting question
+from `docs/yahoo-pricing-poc.md` §6 were open. It is resolved in practice, and
+that changes real conclusions:
+
+- **015** excluded rate limiting and origin checks as near-worthless "for a
+  local-first single-user run". Wrong premise. §6 item 2 — *"Deployed publicly
+  they are an open Yahoo proxy — and the history route is the expensive one"* —
+  describes production. The history route turns **one inbound request into up to
+  101 upstream Yahoo requests** (one per symbol at `MAX_SYMBOLS`, plus FX),
+  unauthenticated and unthrottled. 015 now includes an origin check and a lower
+  history-route ceiling; a shared-store rate limiter is flagged as a maintainer
+  decision, not an executor's.
+- **007** preferred client-side caching partly because hosting was "undecided".
+  That reason is gone; the privacy argument for client-side remains and is now
+  the actual one.
+- **014** was told not to resolve the hosting question. It must now describe
+  both cases: self-hosted, the server is your own machine; on the hosted
+  instance, a user's tickers pass through someone else's deployment.
+- **Account IDs in URL paths** (below) now reach Vercel's access logs, and a
+  **CSP** (deferred) is more relevant than when it was assessed.
+
+Honest bound on the risk: nothing user-derived is stored server-side, so this is
+cost and IP-reputation exposure — your Vercel invocations, and Yahoo potentially
+refusing the deployment — not a data breach.
+
 ## Dependency notes
 
 **Hard dependency**
@@ -49,6 +146,11 @@ document, not a feature. They must not modify production code.
   lands, a stored file that fails that re-parse is silently deleted from
   IndexedDB — exactly the bug 004 fixes. Running 008 first would trigger the data
   loss for real users. 008 has a STOP condition that greps for 004's function.
+
+- **018 requires 004 and 005.** It exists to verify exactly what they fixed, so
+  it must branch from `advisor/005-gate-uploader-on-hydration` (which already
+  contains 004). Running it earlier would assert behaviour that does not exist
+  yet.
 
 **Soft ordering**
 
@@ -77,21 +179,57 @@ document, not a feature. They must not modify production code.
 - **002, if landed, is touched by both 003 and 008** — each adds a field to
   `SourceFile`, so `merge.test.ts`'s fixture factory needs the new default.
 
-## Baseline at planning time
+## Baseline
 
-Measured at commit `d1d2640`, not assumed. If any of these differs when you
-start, treat it as drift and check your plan's "Current state" excerpts before
-proceeding.
+Re-measured at commit `1d09a07` in a **clean worktree** (no `node_modules`, no
+`.next/`), which is what an executor and what CI actually see. If any of these
+differs when you start, treat it as drift and check your plan's "Current state"
+excerpts before proceeding.
 
-| Command | Result |
+| Command | Result on a clean checkout |
 |---|---|
-| `pnpm typecheck` | exit 0 |
-| `pnpm test` | exit 0 — 13 files, 227 tests |
-| `pnpm check` | exit 0 — 5 warnings, all unused variables in `src/lib/google-sheet.ts` |
-| `pnpm build` | not measured during planning; documented as clean on `WSA-007` |
+| `pnpm install --frozen-lockfile` | exit 0 |
+| `pnpm check` | exit 0 — 5 warnings, all `noUnusedVariables` in `src/lib/google-sheet.ts` (lines 614, 707, 715, 721, 727) |
+| `pnpm typecheck` | **exit 2 — fails until plan 001 lands. See below.** |
+| `pnpm test` | exit 0 — 13 files, **228** tests |
+| `pnpm build` | exit 0 |
 
 `pnpm check` exiting 0 while printing warnings is expected. Only plan 016 takes
 that count to zero, and no plan promotes warnings to errors.
+
+### ⚠️ `pnpm typecheck` fails on a clean checkout until plan 001 lands
+
+**This affects every plan in this directory**, because they all carry a
+`pnpm typecheck` done criterion and executors work in fresh worktrees.
+
+`tsconfig.json` includes `next-env.d.ts` and `.next/types/**/*.ts`. Both are
+gitignored (`.gitignore:17` and `:45`) and generated by `next dev` / `next build`
+/ `next typegen`, so on a clean checkout neither exists and `tsc` cannot find
+Next.js 16's `PageProps` and `LayoutProps` ambient types:
+
+```
+src/app/accounts/[type]/[accountId]/page.tsx(8,9): error TS2304: Cannot find name 'PageProps'.
+src/app/layout.tsx(25,50): error TS2304: Cannot find name 'LayoutProps'.
+```
+
+**If you are executing a plan before 001 has landed**: run
+`pnpm exec next typegen` once after installing dependencies, then proceed
+normally. This is environment setup, not a deviation from your plan, and not a
+STOP condition — note it in your report and carry on.
+
+Plan 001 fixes this permanently by making the `typecheck` script
+self-provisioning (`next typegen && tsc --noEmit`).
+
+**How this was missed**: the original baseline was measured in a working
+directory that already had a `.next/` from a previous `next dev`. It was caught
+by the executor dispatched for plan 001, which correctly stopped rather than
+routing around it.
+
+### Baseline drift since the plans were written
+
+- **228 tests, not 227.** PR #14 (`1ebb266`, "Cover a three-deep overflow
+  chain") added one case to `src/lib/projection.test.ts` after the plans were
+  drafted. Every plan has been updated. Test file count is unchanged at 13.
 
 ## Findings considered and rejected
 

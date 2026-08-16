@@ -144,7 +144,7 @@ Build the feature list from this, not from the existing one.
 |---|---|---|
 | Confirm a claim | `grep -rni "<term>" src/ package.json` | as stated below |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
-| Tests | `pnpm test` | exit 0, 227 pass |
+| Tests | `pnpm test` | exit 0, 228 pass |
 
 ## Scope
 
@@ -274,7 +274,7 @@ Development and Contributing sections were accurate at the time of writing —
 confirm they still are, and fix anything you find, but do not restructure the
 document. This is a correction, not a rewrite.
 
-**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 227 tests
+**Verify**: `pnpm check && pnpm typecheck && pnpm test` → all exit 0, 228 tests
 pass. (This plan changes no code; movement means something is wrong.)
 
 **Verify**: `git status --short` → only `README.md`.
@@ -305,7 +305,7 @@ Machine-checkable. ALL must hold:
       `grep -ci "merge" README.md` each return at least 1
 - [ ] The privacy statement names ticker symbols as the only thing that crosses
       the wire, and is not scoped to a branch
-- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 227 tests pass
+- [ ] `pnpm check && pnpm typecheck && pnpm test` all exit 0, 228 tests pass
 - [ ] `git status --short` lists only `README.md`
 - [ ] `plans/README.md` status row for 014 updated
 
@@ -319,10 +319,16 @@ Stop and report back (do not improvise) if:
   something other than ticker symbols and two dates reaches
   `src/app/api/prices/*`. That would be a serious finding and must be reported
   rather than documented.
-- You conclude the README should say the app is safe to deploy publicly. It
-  should not: `docs/yahoo-pricing-poc.md` §6 records that decision as open, and
-  the routes have no rate limiting. Describe the self-hosted case and state the
-  shared-deployment caveat; do not resolve the question.
+- You conclude the README should recommend deploying this publicly, or should
+  claim the hosted instance is hardened. It is not — the routes still have no
+  rate limiting (`plans/015` addresses that).
+  **Note the premise changed**: an earlier revision of this plan told you not to
+  resolve the hosting question. It is resolved — `https://ws-analytics.vercel.app`
+  has served production since 2026-08-11 and is set as this repository's
+  homepage. So the README must describe **both** cases honestly: self-hosted,
+  the server is the reader's own machine; on the hosted instance, their ticker
+  symbols pass through someone else's deployment. Saying only the first would
+  now be misleading.
 - You find yourself editing a file under `src/` to make a README claim true.
 
 ## Maintenance notes
