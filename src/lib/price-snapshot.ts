@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { daysBetween, todayLocalIso } from "@/lib/calendar-date";
 import type { PositionsReport } from "@/lib/positions";
 
 /**
@@ -236,11 +237,7 @@ export function snapshotAgeDays(
 	snapshot: PriceSnapshot,
 	now = new Date(),
 ): number {
-	const then = new Date(`${snapshot.asOf}T00:00:00`).getTime();
-	const today = new Date(
-		`${now.toISOString().slice(0, 10)}T00:00:00`,
-	).getTime();
-	return Math.max(0, Math.round((today - then) / 86_400_000));
+	return Math.max(0, daysBetween(snapshot.asOf, todayLocalIso(now)));
 }
 
 /** Past this, the prices are old enough that the UI should say so. */
