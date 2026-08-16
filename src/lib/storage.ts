@@ -142,6 +142,12 @@ function readValue<T>(request: IDBRequest<T>): Promise<T | undefined> {
 export async function loadSources(): Promise<{
 	sources: SourceFile[];
 	reparsed: number;
+	/**
+	 * Files whose stored raw text no longer parses under the current parser.
+	 * They are kept in the database — their rows are simply unavailable this
+	 * session, so the caller can say so rather than the file vanishing.
+	 */
+	failed: string[];
 }> {
 	const db = await openDb();
 	try {
@@ -153,7 +159,7 @@ export async function loadSources(): Promise<{
 			tx.objectStore(META).get(ORDER_KEY),
 		);
 
-		if (stored.length === 0) return { sources: [], reparsed: 0 };
+		if (stored.length === 0) return { sources: [], reparsed: 0, failed: [] };
 
 		const order = meta?.fileNames ?? [];
 		const byName = new Map(stored.map((entry) => [entry.fileName, entry]));
@@ -165,6 +171,7 @@ export async function loadSources(): Promise<{
 
 		let reparsed = 0;
 		const sources: SourceFile[] = [];
+		const failed: string[] = [];
 		for (const entry of ordered) {
 			if (entry.parserVersion === PARSER_VERSION) {
 				sources.push({
@@ -178,11 +185,14 @@ export async function loadSources(): Promise<{
 				sources.push(await parseActivities(entry.rawText, entry.fileName));
 				reparsed++;
 			} catch {
-				// A file that no longer parses is dropped rather than blocking startup.
+				// The raw text stays in the database: it is the only copy, and a
+				// parser fix later may well read it. Dropping it from this session's
+				// list keeps startup working; deleting it would not be recoverable.
+				failed.push(entry.fileName);
 			}
 		}
 
-		return { sources, reparsed };
+		return { sources, reparsed, failed };
 	} finally {
 		db.close();
 	}
@@ -206,6 +216,33 @@ export async function saveSources(sources: SourceFile[]): Promise<void> {
 			key: ORDER_KEY,
 			fileNames: sources.map((source) => source.fileName),
 		});
+		await done(tx);
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * Writes these sources without clearing the store.
+ *
+ * `saveSources` is a wholesale replace, which is right when the caller owns the
+ * complete set. It is wrong after a partial re-parse: a file that failed to
+ * parse is absent from the list but still present — and still the only copy of
+ * its raw text — in the database.
+ */
+export async function updateSources(sources: SourceFile[]): Promise<void> {
+	const db = await openDb();
+	try {
+		const tx = db.transaction(SOURCES, "readwrite");
+		const store = tx.objectStore(SOURCES);
+		for (const source of sources) {
+			store.put({
+				fileName: source.fileName,
+				rawText: source.rawText,
+				activities: source.activities,
+				parserVersion: PARSER_VERSION,
+			} satisfies StoredSource);
+		}
 		await done(tx);
 	} finally {
 		db.close();

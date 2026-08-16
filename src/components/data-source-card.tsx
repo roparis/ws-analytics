@@ -4,6 +4,7 @@ import { AlertTriangle, Files, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { CsvUploader } from "@/components/csv-uploader";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDatasetStore } from "@/stores/dataset";
 
 interface DataSourceCardProps {
@@ -18,7 +19,22 @@ interface DataSourceCardProps {
  */
 export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 	const dataset = useDatasetStore((state) => state.dataset);
+	const hydrated = useDatasetStore((state) => state.hydrated);
 	const clear = useDatasetStore((state) => state.clear);
+
+	// The uploader and the clear button both write to the same store IndexedDB
+	// is still being read into. Offering either before the read lands lets a
+	// drop run against an empty source list, and `saveSources` clears the store
+	// before writing — so the files already saved would be deleted. Every page
+	// body waits for `hydrated` via `RequireDataset`; the sidebar is outside
+	// that gate and has to wait for itself.
+	if (!hydrated) {
+		return compact ? (
+			<Skeleton className="h-8 w-24 rounded-3xl" />
+		) : (
+			<Skeleton className="h-24 w-full rounded-3xl" />
+		);
+	}
 
 	// Nothing loaded yet: the page itself is the dropzone, so all this needs
 	// to offer is the file picker.
