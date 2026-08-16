@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type Coverage, yearAccountStats } from "@/lib/analytics";
 import {
 	buildPositions,
 	detectListing,
@@ -653,6 +654,141 @@ describe("realisations", () => {
 
 		const dates = report.realizations.map((event) => event.date);
 		expect(dates).toEqual([...dates].sort());
+	});
+});
+
+describe("closing write-off date", () => {
+	it("dates the closing write-off to the sale that closed the position", () => {
+		// Characterization: a sale that exactly zeroes the pool already carries
+		// the right date on its own realisation, before and after the fix.
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, transactionDate: "2025-01-10", unitPrice: 10 }),
+			trade({ quantity: -10, transactionDate: "2025-06-15", unitPrice: 12 }),
+		]);
+
+		const closing = report.realizations.at(-1);
+		expect(closing?.date).toBe("2025-06-15");
+	});
+
+	it("dates the closing write-off to the corporate action that zeroed the shares, not the last trade", () => {
+		// The bug: the buy is the only trade, so `lastTradeDate` stays stuck in
+		// year A. The unpaired correction two years later is what actually closes
+		// the position, and the write-off belongs in year B.
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, unitPrice: 10, transactionDate: "2024-02-01" }),
+			makeActivity({
+				activitySubType: "NAME_CHANGE",
+				activityType: "LegacyCorporateAction",
+				description: "ZAG - Fund: Corrected quantity of shares by -10",
+				netCashAmount: 0,
+				quantity: -10,
+				symbol: "ZAG",
+				transactionDate: "2026-03-01",
+			}),
+		]);
+		const position = report.positions[0];
+
+		expect(position.shares).toBe(0);
+		expect(position.issues.map((issue) => issue.flag)).toContain(
+			"corporate-action-unpaired",
+		);
+
+		const closing = report.realizations.at(-1);
+		expect(closing?.date).toBe("2026-03-01");
+	});
+
+	it("lands the closing write-off in the corporate action's year, not the last trade's, once bucketed by yearAccountStats", () => {
+		const activities = [
+			funding(1000),
+			trade({ quantity: 10, unitPrice: 10, transactionDate: "2024-02-01" }),
+			makeActivity({
+				activitySubType: "NAME_CHANGE",
+				activityType: "LegacyCorporateAction",
+				description: "ZAG - Fund: Corrected quantity of shares by -10",
+				netCashAmount: 0,
+				quantity: -10,
+				symbol: "ZAG",
+				transactionDate: "2026-03-01",
+			}),
+		];
+		const report = buildPositions(activities);
+		const coverage: Coverage = { start: "2024-01-01", end: "2026-12-31" };
+		const rows = yearAccountStats(activities, report, coverage);
+
+		const rowA = rows.find(
+			(row) => row.year === "2024" && row.accountType === "TFSA",
+		);
+		const rowB = rows.find(
+			(row) => row.year === "2026" && row.accountType === "TFSA",
+		);
+
+		expect(rowB?.earned.realized).toBeCloseTo(-100, 6);
+		expect(rowA?.earned.realized ?? 0).toBeCloseTo(0, 6);
+	});
+
+	it("dates the closing write-off to the corporate action, not a dividend that arrived after the last trade", () => {
+		// Proves the field tracks the row that actually closed the pool, not
+		// merely "any later row": the dividend sits between the trade and the
+		// closing correction, and must not be mistaken for the closing event.
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, unitPrice: 10, transactionDate: "2024-02-01" }),
+			makeActivity({
+				activityType: "Dividend",
+				activitySubType: "DIV",
+				description: "ZAG - Fund: Cash distribution",
+				netCashAmount: 5,
+				quantity: 5,
+				symbol: "ZAG",
+				transactionDate: "2024-06-01",
+			}),
+			makeActivity({
+				activitySubType: "NAME_CHANGE",
+				activityType: "LegacyCorporateAction",
+				description: "ZAG - Fund: Corrected quantity of shares by -10",
+				netCashAmount: 0,
+				quantity: -10,
+				symbol: "ZAG",
+				transactionDate: "2026-03-01",
+			}),
+		]);
+
+		const closing = report.realizations.at(-1);
+		expect(closing?.date).toBe("2026-03-01");
+		expect(closing?.date).not.toBe("2024-06-01");
+	});
+
+	it("keeps the realisation-sum invariant on the corporate-action-closed fixture", () => {
+		// Same safety net as `positions.test.ts:622-626`, re-run on the fixture
+		// this plan is fixing — amounts must not move, only dates.
+		const report = buildPositions([
+			funding(1000),
+			trade({ quantity: 10, unitPrice: 10, transactionDate: "2024-02-01" }),
+			makeActivity({
+				activitySubType: "NAME_CHANGE",
+				activityType: "LegacyCorporateAction",
+				description: "ZAG - Fund: Corrected quantity of shares by -10",
+				netCashAmount: 0,
+				quantity: -10,
+				symbol: "ZAG",
+				transactionDate: "2026-03-01",
+			}),
+		]);
+
+		const logged = report.realizations.reduce(
+			(total, event) => total + event.amount,
+			0,
+		);
+		expect(logged).toBeCloseTo(report.totals.realizedPnl, 6);
+
+		for (const position of report.positions) {
+			const forSymbol = report.realizations
+				.filter((event) => event.symbol === position.symbol)
+				.reduce((total, event) => total + event.amount, 0);
+			expect(forSymbol).toBeCloseTo(position.realizedPnl, 6);
+		}
 	});
 });
 
