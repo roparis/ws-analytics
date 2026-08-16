@@ -8,9 +8,10 @@
 		"start": "next start",
 		"check": "biome check .",
 		"check:write": "biome check --write .",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "next typegen && tsc --noEmit",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"verify": "pnpm check && pnpm typecheck && pnpm test"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.6.0",
