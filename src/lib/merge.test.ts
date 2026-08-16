@@ -51,6 +51,7 @@ function makeSource(fileName: string, activities: Activity[]): SourceFile {
 		// so a placeholder here is correct and honest, not a shortcut.
 		rawText: "not read by the merge logic",
 		activities,
+		problems: [],
 	};
 }
 
@@ -304,5 +305,32 @@ describe("analyzeMerge", () => {
 			sourceB.activities[1],
 		]);
 		expect(analysis.skippedBySource["export-1.csv"]).toEqual([]);
+	});
+});
+
+describe("mergeSources — problems pass through unchanged", () => {
+	it("carries each source's problems onto its summary, including a source whose rows were partly skipped", () => {
+		const sourceA: SourceFile = {
+			...makeSource("export-1.csv", [moneyRow("2026-01-15", 100)]),
+			problems: [
+				"TFSA TEST0001CAD: net cash sums to 9999.00 — not a plausible balance",
+			],
+		};
+		const sourceB: SourceFile = {
+			...makeSource("export-2.csv", [
+				moneyRow("2026-01-15", 100), // overlaps sourceA's row — skipped
+				moneyRow("2026-01-20", 50), // no overlap — kept
+			]),
+			problems: [],
+		};
+
+		const merged = mustMerge([sourceA, sourceB]);
+
+		expect(merged.sources[0].problems).toBe(sourceA.problems);
+		expect(merged.sources[1].problems).toBe(sourceB.problems);
+		// sourceB is the case that matters: it lost a row to the overlap and its
+		// (empty) problems list still carries through untouched.
+		expect(merged.sources[1].rowsSkipped).toBe(1);
+		expect(merged.sources[1].rowsUsed).toBe(1);
 	});
 });

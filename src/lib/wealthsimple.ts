@@ -322,16 +322,14 @@ export function parseActivities(
 					);
 				}
 
-				if (process.env.NODE_ENV !== "production") {
-					const problems = validateDataset(activities);
-					if (problems.length > 0) {
-						console.warn(
-							`${fileName}: ${problems.length} data-invariant violation(s). The export may not match docs/wealthsimple-csv-format.md:\n${problems.slice(0, 20).join("\n")}`,
-						);
-					}
-				}
+				// The invariants are the export's own self-check, so they run in
+				// every build rather than only in development. The messages name
+				// accounts and balances, so they travel to the UI on the source
+				// itself instead of to a console anyone recording the screen can
+				// read. See docs/wealthsimple-csv-format.md §6.
+				const problems = validateDataset(activities);
 
-				resolve({ fileName, rawText, activities });
+				resolve({ fileName, rawText, activities, problems });
 			},
 			error: (error: Error) => reject(error),
 		});

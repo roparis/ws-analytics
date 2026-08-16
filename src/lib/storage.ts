@@ -5,6 +5,7 @@ import {
 	type Activity,
 	PARSER_VERSION,
 	parseActivities,
+	validateDataset,
 } from "@/lib/wealthsimple";
 
 /**
@@ -178,6 +179,10 @@ export async function loadSources(): Promise<{
 					fileName: entry.fileName,
 					rawText: entry.rawText,
 					activities: entry.activities,
+					// Recomputed rather than stored: it is a pure pass over rows
+					// already in memory, and a stored copy could outlive a change to
+					// the checks themselves.
+					problems: validateDataset(entry.activities),
 				});
 				continue;
 			}

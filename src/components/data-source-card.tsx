@@ -47,6 +47,10 @@ export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 		(total, source) => total + source.rowsSkipped,
 		0,
 	);
+	const flagged = dataset.sources.reduce(
+		(total, source) => total + source.problems.length,
+		0,
+	);
 
 	const clearButton = (
 		<Button
@@ -69,7 +73,7 @@ export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 						<Link href="/merge">
 							<Files className="size-4" />
 							{dataset.sources.length}
-							{conflicts > 0 && (
+							{(conflicts > 0 || flagged > 0) && (
 								<AlertTriangle className="size-3.5 text-destructive" />
 							)}
 						</Link>
@@ -108,6 +112,12 @@ export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 							{skipped.toLocaleString()} duplicate rows skipped
 						</span>
 					)
+				)}
+				{flagged > 0 && (
+					<span className="flex items-start gap-1 pt-0.5 text-destructive text-xs">
+						<AlertTriangle className="mt-0.5 size-3 shrink-0" />
+						{flagged} row{flagged === 1 ? "" : "s"} don't add up — review
+					</span>
 				)}
 			</Link>
 			<div className="flex items-center gap-1">
