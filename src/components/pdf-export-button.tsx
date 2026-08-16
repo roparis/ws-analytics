@@ -5,7 +5,6 @@ import type { RefObject } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { exportElementToPdf } from "@/lib/pdf";
 
 interface PdfExportButtonProps {
 	targetRef: RefObject<HTMLElement | null>;
@@ -20,6 +19,11 @@ export function PdfExportButton({ targetRef, filename }: PdfExportButtonProps) {
 
 		setIsExporting(true);
 		try {
+			// Imported here rather than at the top of the file: `@/lib/pdf` pulls in
+			// jspdf and html2canvas-pro, which are large and are only ever needed by
+			// this click. A failed chunk load lands in the same catch as a failed
+			// render, and the button is already disabled while we wait.
+			const { exportElementToPdf } = await import("@/lib/pdf");
 			await exportElementToPdf(targetRef.current, filename);
 		} catch (error) {
 			// The toast can only say that it failed. Rendering the DOM to a canvas
