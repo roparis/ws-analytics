@@ -26,7 +26,7 @@ otherwise.
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | TODO |
-| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | TODO |
+| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (awaiting merge) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
@@ -136,6 +136,43 @@ that changes real conclusions:
 Honest bound on the risk: nothing user-derived is stored server-side, so this is
 cost and IP-reputation exposure — your Vercel invocations, and Yahoo potentially
 refusing the deployment — not a data breach.
+
+- **015 — COMPLETE, reviewed, APPROVED. Awaiting merge.** The first plan executed
+  against the re-scoped, production-aware version. Every criterion re-run
+  independently: `typecheck` 0, `check` 0 (still exactly 5 warnings), `test` 0
+  (13 files / **244** — 228 plus 16 new), `build` 0. Scope clean: the two route
+  files, `live-prices.ts`, `live-prices.test.ts`. `MAX_SYMBOLS` still 100,
+  `queue: { concurrency: 4 }` untouched, no infrastructure dependency added.
+  Verified by reading the code, not the report:
+  - The origin check is the right way round —
+    `if (secFetchSite && secFetchSite !== "same-origin")`, so an **absent**
+    header is allowed and the documented `curl` examples keep working. The
+    executor confirmed this empirically against a running server: no header →
+    200, `same-origin` → 200, `cross-site` → 403.
+  - `MAX_HISTORY_SYMBOLS = 60`, enforced via an optional `maxSymbols` parameter,
+    and its test asserts `symbols.length < MAX_SYMBOLS` — so it would fail if the
+    history ceiling were ever raised to match the shared one.
+  - The ticker regex exists once, as a named `TICKER_SHAPE`, applied to both
+    `ticker` and `symbol`.
+  - No upstream text reaches a client. The 502 handlers log error class and a
+    symbol count; the per-symbol miss names only the ticker.
+  Commit range `c6ad2d5..764ee67` (6 commits) on branch
+  `advisor/015-route-input-validation`, from `origin/main`. **Not merged, not
+  pushed.**
+  *Residual, accepted*: the two 400 paths still interpolate the app's own
+  validation message, which echoes the rejected value — and a value that failed
+  the shape test is by definition unbounded. It is JSON-encoded, returned only to
+  the sender, and reveals nothing about the server, so it is reflection rather
+  than a vulnerability. Recorded so nobody re-derives it.
+  *Plan gaps the executor found*: the Git workflow section named only three
+  commit messages because Steps 7 and 8 were added after it was last edited — now
+  fixed. And its own first pass at Step 3 wrote the ticker regex a second time,
+  which the `grep -c ... returns 1` criterion caught; it factored out
+  `TICKER_SHAPE` rather than loosening the check.
+  *Not covered*: throttling by request rate. Steps 7 and 8 reduce the exposure —
+  cross-site abuse is blocked and the worst-case amplification drops from ~101 to
+  ~61 upstream requests — but a determined same-origin caller is still
+  unthrottled. A shared-store limiter remains a maintainer decision.
 
 ## Dependency notes
 
