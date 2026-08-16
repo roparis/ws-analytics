@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { type MergedDataset, mergeSources, type SourceFile } from "@/lib/merge";
+import { once } from "@/lib/once";
 import {
 	clearStorage,
 	loadSources,
@@ -50,12 +51,17 @@ function reportFailedSources(fileNames: string[]) {
 	);
 }
 
-export const useDatasetStore = create<DatasetState>((set, get) => ({
-	sources: [],
-	dataset: null,
-	hydrated: false,
-	hydrate: async () => {
-		if (get().hydrated) return;
+export const useDatasetStore = create<DatasetState>((set, get) => {
+	// `hydrate` is check-then-act: it reads `hydrated`, then awaits IndexedDB,
+	// then writes. Two callers can both pass the check before either resolves —
+	// exactly what React Strict Mode's double-invoked effect does — and the
+	// second then finds `state.sources` already populated by the first. It
+	// can't tell that apart from a user having dropped a file mid-read, so it
+	// takes the `raced` branch below and its wholesale `saveSources` deletes
+	// whatever a failed re-parse was preserving. Latching the run so every
+	// concurrent caller shares the same in-flight promise — same idiom as
+	// `schemaReady` in `src/lib/storage.ts` — closes that window.
+	const runHydration = once(async () => {
 		try {
 			const { sources, reparsed, failed } = await loadSources();
 			let raced = false;
@@ -102,55 +108,65 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
 			console.warn("Could not read local storage:", error);
 			set({ hydrated: true });
 		}
-	},
-	addSources: (incoming) =>
-		set((state) => {
-			// File name is the source identity, so collapse repeats within the batch
-			// as well as against what is already loaded — re-adding a file replaces
-			// it rather than double-counting, and never yields two sources with the
-			// same name.
-			const deduped = [
-				...new Map(
-					incoming.map((source) => [source.fileName, source]),
-				).values(),
-			];
-			const names = new Set(deduped.map((source) => source.fileName));
-			const kept = state.sources.filter(
-				(source) => !names.has(source.fileName),
-			);
-			const next = [...kept, ...deduped];
-			persist(saveSources(next));
-			return withSources(next);
-		}),
-	removeSource: (fileName) =>
-		set((state) => {
-			const next = state.sources.filter(
-				(source) => source.fileName !== fileName,
-			);
-			persist(saveSources(next));
-			return withSources(next);
-		}),
-	moveSource: (fileName, direction) =>
-		set((state) => {
-			const index = state.sources.findIndex(
-				(source) => source.fileName === fileName,
-			);
-			const target = direction === "up" ? index - 1 : index + 1;
-			if (index === -1 || target < 0 || target >= state.sources.length) {
-				return state;
-			}
-			const next = [...state.sources];
-			[next[index], next[target]] = [next[target], next[index]];
-			// Only the order changed, so skip rewriting every row.
-			persist(saveOrder(next.map((source) => source.fileName)));
-			return withSources(next);
-		}),
-	clear: () => {
-		persist(clearStorage());
-		set({ sources: [], dataset: null });
-		// `clearStorage` already removes the stored prices; this drops the copy
-		// still in memory, so the app doesn't keep valuing a portfolio whose
-		// activity files have just been deleted.
-		usePriceStore.getState().reset();
-	},
-}));
+	});
+
+	return {
+		sources: [],
+		dataset: null,
+		hydrated: false,
+		hydrate: async () => {
+			if (get().hydrated) return;
+			await runHydration();
+		},
+		addSources: (incoming) =>
+			set((state) => {
+				// File name is the source identity, so collapse repeats within the batch
+				// as well as against what is already loaded — re-adding a file replaces
+				// it rather than double-counting, and never yields two sources with the
+				// same name.
+				const deduped = [
+					...new Map(
+						incoming.map((source) => [source.fileName, source]),
+					).values(),
+				];
+				const names = new Set(deduped.map((source) => source.fileName));
+				const kept = state.sources.filter(
+					(source) => !names.has(source.fileName),
+				);
+				const next = [...kept, ...deduped];
+				persist(saveSources(next));
+				return withSources(next);
+			}),
+		removeSource: (fileName) =>
+			set((state) => {
+				const next = state.sources.filter(
+					(source) => source.fileName !== fileName,
+				);
+				persist(saveSources(next));
+				return withSources(next);
+			}),
+		moveSource: (fileName, direction) =>
+			set((state) => {
+				const index = state.sources.findIndex(
+					(source) => source.fileName === fileName,
+				);
+				const target = direction === "up" ? index - 1 : index + 1;
+				if (index === -1 || target < 0 || target >= state.sources.length) {
+					return state;
+				}
+				const next = [...state.sources];
+				[next[index], next[target]] = [next[target], next[index]];
+				// Only the order changed, so skip rewriting every row.
+				persist(saveOrder(next.map((source) => source.fileName)));
+				return withSources(next);
+			}),
+		clear: () => {
+			persist(clearStorage());
+			set({ sources: [], dataset: null });
+			// `clearStorage` already removes the stored prices; this drops the copy
+			// still in memory, so the app doesn't keep valuing a portfolio whose
+			// activity files have just been deleted.
+			usePriceStore.getState().reset();
+		},
+	};
+});
