@@ -30,7 +30,7 @@ otherwise.
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (awaiting merge) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
-| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | TODO |
+| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE — partial (awaiting merge) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
 
@@ -160,6 +160,49 @@ document, not a feature. They must not modify production code.
   clicking repeatedly within a month and barely at all for someone clicking once
   a month. It is **not** a substitute for the bounds 015 added. Corrected in
   place.
+
+- **018 — PARTIAL, reviewed, APPROVED. Awaiting merge.** Three specs, all green;
+  I ran the suite three times independently — 3/3 each, 4.5s, one worker, no
+  flakes. Scope clean: `src/` untouched (empty diff), the existing `ci.yml`
+  untouched, no CSV committed, no `.gitignore` exception, Vitest still 244.
+  **The recovery half of the race test was deliberately not shipped, and the
+  reason is the best outcome available**: it is unreachable, because 005 works.
+  `addSources` is the only path to the race, it is called only from
+  `csv-uploader.tsx`, and every `CsvUploader` mount sits behind a `hydrated`
+  guard (`data-source-card.tsx` and `require-dataset.tsx`) — I verified all
+  three claims on `main`. The guard spec proves it empirically:
+  `input[type="file"]` has count **0** during the delayed read. Reaching the race
+  would mean calling the store from `page.evaluate`, which needs `src/` changes
+  to expose it — out of scope, and rightly. 005 didn't make the race hard to
+  hit; it made it unreachable through any surface a user has.
+  Commits `45b23af..f57caf7` on `advisor/018-e2e-data-loss-paths`.
+
+### 🔴 Finding: `hydrate()`'s guard is not concurrency-safe
+
+Surfaced by writing the E2E suite, which is the argument for having written it —
+no unit test could have reached this.
+
+`if (get().hydrated) return;` (`src/stores/dataset.ts`) is a **check-then-act on
+shared state**. Two concurrent entries both pass it, because neither has resolved
+`loadSources()` yet. The first sets `sources`; the second then observes
+`state.sources.length !== 0`, concludes a *user* raced it, takes 005's `raced`
+branch, and calls `saveSources(get().sources)` — **a wholesale replace that
+deletes exactly the record 004 exists to preserve.**
+
+So 005's data-protecting path becomes data-destroying when `hydrate` races
+itself. Confirmed empirically by the executor with an instrumented
+`indexedDB.open` counter: 9 opens and 2 identical toasts under `next dev`, versus
+4 opens and 1 toast against the production build.
+
+**Today the only trigger is React Strict Mode**, which double-invokes effects in
+`next dev` and is off in production — so this is a development-only symptom right
+now, and the E2E suite correctly runs against the production build rather than
+chasing it. But the guard is structurally unsafe: any second caller of `hydrate`,
+ever, reproduces it in production. Developers also hit it constantly, and it
+defeats 004 precisely in the scenario 004 was written for.
+
+Cheap to fix — latch the in-flight promise rather than a boolean. **Needs its own
+plan; none exists yet.**
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
