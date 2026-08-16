@@ -2,10 +2,9 @@ import YahooFinance from "yahoo-finance2";
 import {
 	type LivePriceMiss,
 	type LivePriceQuote,
-	type LivePriceRequest,
 	type LivePriceResponse,
-	MAX_SYMBOLS,
 	type PriceRequestSymbol,
+	readRequestSymbols,
 } from "@/lib/live-prices";
 import { USD_CAD_TICKER } from "@/lib/yahoo-ticker";
 
@@ -46,7 +45,7 @@ const yahooFinance = new YahooFinance({
 export async function POST(request: Request): Promise<Response> {
 	let symbols: PriceRequestSymbol[];
 	try {
-		symbols = readSymbols(await request.json());
+		symbols = readRequestSymbols((await request.json())?.symbols, "quote");
 	} catch (error) {
 		return fail(error instanceof Error ? error.message : "Bad request.", 400);
 	}
@@ -136,34 +135,6 @@ export async function POST(request: Request): Promise<Response> {
 			502,
 		);
 	}
-}
-
-/** Parses the body defensively — this is the app's only untrusted input. */
-function readSymbols(body: unknown): PriceRequestSymbol[] {
-	const symbols = (body as LivePriceRequest | null)?.symbols;
-	if (!Array.isArray(symbols)) {
-		throw new Error("Expected a JSON body with a `symbols` array.");
-	}
-	if (symbols.length === 0) {
-		throw new Error("No symbols to quote.");
-	}
-	if (symbols.length > MAX_SYMBOLS) {
-		throw new Error(`At most ${MAX_SYMBOLS} symbols per request.`);
-	}
-
-	return symbols.map((entry) => {
-		const symbol = stringOrNull(entry?.symbol)?.trim();
-		const ticker = stringOrNull(entry?.ticker)?.trim();
-		if (!symbol || !ticker) {
-			throw new Error("Every entry needs a `symbol` and a `ticker`.");
-		}
-		// Tickers go into a query string; Yahoo's own alphabet is letters, digits
-		// and `.-=^`, so anything else is a caller doing something else.
-		if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(ticker)) {
-			throw new Error(`"${ticker}" isn't a ticker.`);
-		}
-		return { symbol, ticker };
-	});
 }
 
 /**

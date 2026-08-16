@@ -152,15 +152,11 @@ describe("readRequestSymbols", () => {
 	});
 
 	it("rejects an entry missing `ticker`", () => {
-		expect(() =>
-			readRequestSymbols([{ symbol: "VFV" }], "quote"),
-		).toThrow();
+		expect(() => readRequestSymbols([{ symbol: "VFV" }], "quote")).toThrow();
 	});
 
 	it("rejects an entry missing `symbol`", () => {
-		expect(() =>
-			readRequestSymbols([{ ticker: "VFV.TO" }], "quote"),
-		).toThrow();
+		expect(() => readRequestSymbols([{ ticker: "VFV.TO" }], "quote")).toThrow();
 	});
 
 	it("rejects a ticker with a disallowed character", () => {
@@ -171,10 +167,7 @@ describe("readRequestSymbols", () => {
 
 	it("rejects a ticker longer than 20 characters", () => {
 		expect(() =>
-			readRequestSymbols(
-				[{ symbol: "VFV", ticker: "A".repeat(21) }],
-				"quote",
-			),
+			readRequestSymbols([{ symbol: "VFV", ticker: "A".repeat(21) }], "quote"),
 		).toThrow();
 	});
 
@@ -189,10 +182,7 @@ describe("readRequestSymbols", () => {
 
 	it("rejects a symbol with a disallowed character — the new bound", () => {
 		expect(() =>
-			readRequestSymbols(
-				[{ symbol: "VFV!", ticker: "VFV.TO" }],
-				"quote",
-			),
+			readRequestSymbols([{ symbol: "VFV!", ticker: "VFV.TO" }], "quote"),
 		).toThrow();
 	});
 
@@ -210,13 +200,7 @@ describe("readRequestSymbols", () => {
 		// (class shares hyphenated), bare for US listings (also hyphenated), and
 		// a `-CAD` suffix for crypto. USDCAD=X is the FX pair the routes add
 		// alongside whatever the caller asked for.
-		const shapes = [
-			"VFV.TO",
-			"CTC-A.TO",
-			"BRK-B",
-			"BTC-CAD",
-			"USDCAD=X",
-		];
+		const shapes = ["VFV.TO", "CTC-A.TO", "BRK-B", "BTC-CAD", "USDCAD=X"];
 		const symbols = shapes.map((ticker) => ({ symbol: ticker, ticker }));
 		expect(readRequestSymbols(symbols, "quote")).toHaveLength(shapes.length);
 	});

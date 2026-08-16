@@ -1,11 +1,11 @@
 import YahooFinance from "yahoo-finance2";
 import {
 	type LivePriceMiss,
-	MAX_SYMBOLS,
 	type PriceHistoryRequest,
 	type PriceHistoryResponse,
 	type PriceHistorySeries,
 	type PriceRequestSymbol,
+	readRequestSymbols,
 } from "@/lib/live-prices";
 import { marketMonth } from "@/lib/market-month";
 import { USD_CAD_TICKER } from "@/lib/yahoo-ticker";
@@ -195,17 +195,7 @@ function readRequest(body: unknown): {
 	to: string;
 } {
 	const input = body as PriceHistoryRequest | null;
-	const symbols = input?.symbols;
-
-	if (!Array.isArray(symbols)) {
-		throw new Error("Expected a JSON body with a `symbols` array.");
-	}
-	if (symbols.length === 0) {
-		throw new Error("No symbols to chart.");
-	}
-	if (symbols.length > MAX_SYMBOLS) {
-		throw new Error(`At most ${MAX_SYMBOLS} symbols per request.`);
-	}
+	const symbols = readRequestSymbols(input?.symbols, "chart");
 
 	const from = isoDate(input?.from);
 	const to = isoDate(input?.to);
@@ -216,23 +206,7 @@ function readRequest(body: unknown): {
 		throw new Error("`from` is after `to`.");
 	}
 
-	return {
-		from,
-		to,
-		symbols: symbols.map((entry) => {
-			const symbol =
-				typeof entry?.symbol === "string" ? entry.symbol.trim() : "";
-			const ticker =
-				typeof entry?.ticker === "string" ? entry.ticker.trim() : "";
-			if (!symbol || !ticker) {
-				throw new Error("Every entry needs a `symbol` and a `ticker`.");
-			}
-			if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(ticker)) {
-				throw new Error(`"${ticker}" isn't a ticker.`);
-			}
-			return { symbol, ticker };
-		}),
-	};
+	return { from, symbols, to };
 }
 
 function isoDate(value: unknown): string | null {
