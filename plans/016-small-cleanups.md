@@ -7,7 +7,7 @@
 > in `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat d1d2640..HEAD -- package.json pnpm-lock.yaml src/lib/google-sheet.ts src/lib/projection.ts`
+> `git diff --stat 99fa8b4..HEAD -- package.json pnpm-lock.yaml src/lib/google-sheet.ts src/lib/projection.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -20,6 +20,12 @@
 - **Depends on**: none
 - **Category**: tech-debt
 - **Planned at**: commit `d1d2640`, 2026-08-15
+- **Reconciled at**: commit `99fa8b4`, 2026-08-16 — `src/lib/google-sheet.ts` and
+  `src/lib/projection.ts` are **unchanged** since this plan was written, so
+  Defects 2 and 3 including their line numbers are exactly as described.
+  `package.json` changed only in its `scripts` block (`plans/001` added
+  `typecheck`'s `next typegen`, `verify`, and `test:e2e`), which pushed the
+  `dependencies` block down two lines. Its contents are identical.
 
 ## Why this matters
 
@@ -44,7 +50,7 @@ independently revertible.
 
 ### Defect 1 — `shadcn` in `dependencies`
 
-Verified excerpt, `package.json:15-34`:
+Verified excerpt, `package.json:17-36`:
 
 ```json
 	"dependencies": {
@@ -147,7 +153,7 @@ Two further facts to confirm while working, rather than assume:
 |---|---|---|
 | Install | `pnpm install` | exit 0, lockfile updated |
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 228 baseline + new |
+| Tests | `pnpm test` | exit 0, your measured baseline + new |
 | Lint | `pnpm check` | **exit 0 with 0 warnings** after Step 3 |
 | Build | `pnpm build` | exit 0 |
 
@@ -191,7 +197,14 @@ Two further facts to confirm while working, rather than assume:
 
 ### Step 1: Record the baseline
 
-**Verify**: `pnpm typecheck && pnpm test` → exit 0, `Tests 228 passed (228)`.
+Run `pnpm typecheck && pnpm test && pnpm check` and **write down the numbers you
+actually observe** — the passing test count, the file count, and the warning
+count. Do not take a count from this document: several plans have shipped since
+it was written and the suite has grown. Your measured numbers are the baseline
+every later step compares against. At the time of reconciliation this was
+`Tests 293 passed (293)` across 17 files and 5 warnings.
+
+**Verify**: exit 0. Stop only if something **fails**, not if a count differs.
 
 **Verify**: `pnpm check` → exit 0, **5 warnings**, all in
 `src/lib/google-sheet.ts`. Note the count; Step 3 takes it to 0.
@@ -309,7 +322,7 @@ No new tests for Steps 2 and 3: `pnpm build` proves the dependency move, and
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 4 new
+- [ ] `pnpm test` exits 0; every test in your Step 1 baseline still passes, plus at least 4 new
       projection cases
 - [ ] **`pnpm check` exits 0 with 0 warnings**
 - [ ] `pnpm build` exits 0
@@ -319,7 +332,7 @@ Machine-checkable. ALL must hold:
       returns 0
 - [ ] `grep -c "_taxRow\|_feesRow\|_dividendsRow\|_interestRow\|_unrealisedTotal" src/lib/google-sheet.ts`
       returns 0 — deleted, not underscore-renamed
-- [ ] `git diff d1d2640..HEAD -- biome.jsonc` shows **no changes**
+- [ ] `git diff 99fa8b4..HEAD -- biome.jsonc` shows **no changes**
 - [ ] `git log --oneline -3` shows three separate commits
 - [ ] `git status --short` lists only the five in-scope files
 - [ ] `plans/README.md` status row for 016 updated
