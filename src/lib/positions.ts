@@ -184,7 +184,10 @@ export interface PositionsTotals {
  * exactly, and `positions.test.ts` holds them to it.
  */
 export interface RealizationEvent {
-	/** `transactionDate` of the sale, or of the last trade for a closing exit. */
+	/**
+	 * `transactionDate` of the sale, or of whatever row closed the position on a
+	 * full exit — usually the last trade, sometimes a corporate action.
+	 */
 	date: string;
 	accountId: string;
 	accountType: string;
@@ -273,6 +276,14 @@ interface Pool {
 	lastFxRate: number | null;
 	firstTradeDate: string | null;
 	lastTradeDate: string | null;
+	/**
+	 * The last row of any kind this pool saw — trade, dividend or corporate
+	 * action. `lastTradeDate` is deliberately narrower and stays that way: it is
+	 * public on `Position` and drives the closed-position sort. This one exists
+	 * because a pool can be closed by a share-count correction rather than a
+	 * sale, and the residual write-off belongs to whatever actually closed it.
+	 */
+	lastEventDate: string | null;
 	tradeCount: number;
 	rows: Activity[];
 	issues: Map<PositionFlag, PositionIssue>;
@@ -287,6 +298,12 @@ interface Pool {
  */
 function realize(pool: Pool, date: string, amount: number): void {
 	if (amount === 0) return;
+	// An empty date should be unreachable — a pool exists because rows created
+	// it, and every row updates `lastEventDate` before this can be called — but
+	// `?? ""` at the call sites makes it representable. An undated realisation
+	// would count in the lifetime total while being invisible in every year's
+	// row, so it is better to have neither than to have one.
+	if (date === "") return;
 	pool.realizations.push({
 		date,
 		accountId: pool.accountId,
@@ -563,6 +580,7 @@ export function buildPositions(
 			lastFxRate: null,
 			firstTradeDate: null,
 			lastTradeDate: null,
+			lastEventDate: null,
 			tradeCount: 0,
 			rows: rows.map((row) => row.activity),
 			issues: new Map(),
@@ -571,6 +589,8 @@ export function buildPositions(
 		pools.push(pool);
 
 		for (const { activity } of orderForWalk(rows)) {
+			pool.lastEventDate = activity.transactionDate;
+
 			if (!pool.name) pool.name = normalizeName(activity.name);
 			if (activity.symbol && !pool.aliases.includes(activity.symbol)) {
 				pool.aliases.push(activity.symbol);
@@ -689,16 +709,26 @@ export function buildPositions(
 		// belongs to the final disposition — a full exit realizes all remaining cost.
 		if (Math.abs(pool.shares) < SHARE_EPSILON) {
 			pool.realizedPnl -= pool.bookCost;
-			// Dated to the last trade: this residual belongs to the sale that
-			// closed the position, which is the row that produced it.
-			realize(pool, pool.lastTradeDate ?? "", -pool.bookCost);
+			// Dated to whatever row closed the position: usually the sale that
+			// produced it, but sometimes a share-count correction with no trade of
+			// its own. `lastEventDate` covers both; `lastTradeDate` is the fallback
+			// for the (impossible in practice) case of a pool with no rows.
+			realize(
+				pool,
+				pool.lastEventDate ?? pool.lastTradeDate ?? "",
+				-pool.bookCost,
+			);
 			pool.shares = 0;
 			pool.bookCost = 0;
 		} else if (pool.shares < 0) {
 			// Already flagged as `sold-more-than-held`. Clamp so nothing downstream
 			// renders a negative holding, but keep the issue attached.
 			pool.realizedPnl -= pool.bookCost;
-			realize(pool, pool.lastTradeDate ?? "", -pool.bookCost);
+			realize(
+				pool,
+				pool.lastEventDate ?? pool.lastTradeDate ?? "",
+				-pool.bookCost,
+			);
 			pool.shares = 0;
 			pool.bookCost = 0;
 		}
