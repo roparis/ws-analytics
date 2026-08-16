@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { todayLocalIso } from "@/lib/calendar-date";
 import {
 	type LivePriceQuote,
 	type LivePriceResponse,
@@ -105,6 +106,10 @@ describe("snapshotFromLivePrices", () => {
 		);
 
 		expect(snapshot.quotedAt).toBeUndefined();
+	});
+
+	it("defaults asOf to today's local date", () => {
+		expect(snapshotFromLivePrices(response()).asOf).toBe(todayLocalIso());
 	});
 });
 

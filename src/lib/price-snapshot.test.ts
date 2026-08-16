@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { todayLocalIso } from "@/lib/calendar-date";
 import { buildWorkbook, type Cell, SHEET_NAMES } from "@/lib/google-sheet";
 import { buildPositions } from "@/lib/positions";
 import {
@@ -183,6 +184,11 @@ describe("parsePriceCsv", () => {
 			),
 		).toThrow(PriceCsvError);
 	});
+
+	it("defaults asOf to today's local date", () => {
+		const csv = holdingsCsv({ ZAG: 11.5, VTI: 140, XEQT: 34.25 });
+		expect(parsePriceCsv(csv, "Holdings.csv").asOf).toBe(todayLocalIso());
+	});
 });
 
 describe("valueWith", () => {
@@ -277,8 +283,6 @@ describe("snapshotAgeDays", () => {
 
 	it("is exact across the fall-back DST boundary", () => {
 		const fallSnapshot = { ...snapshot, asOf: "2026-10-30" };
-		expect(
-			snapshotAgeDays(fallSnapshot, new Date(2026, 10, 3, 12, 0)),
-		).toBe(4);
+		expect(snapshotAgeDays(fallSnapshot, new Date(2026, 10, 3, 12, 0))).toBe(4);
 	});
 });

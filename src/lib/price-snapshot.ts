@@ -67,7 +67,7 @@ export class PriceCsvError extends Error {}
 export function parsePriceCsv(
 	rawText: string,
 	fileName: string,
-	asOf = new Date().toISOString().slice(0, 10),
+	asOf = todayLocalIso(),
 ): PriceSnapshot {
 	// The Holdings tab opens with title and caveat rows before the header, so
 	// the header row is found rather than assumed to be first.
