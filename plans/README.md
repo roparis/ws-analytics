@@ -30,7 +30,7 @@ otherwise.
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
-| [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | TODO |
+| [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (awaiting merge) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
@@ -178,7 +178,7 @@ document, not a feature. They must not modify production code.
   hit; it made it unreachable through any surface a user has.
   Commits `45b23af..f57caf7` on `advisor/018-e2e-data-loss-paths`.
 
-### 🔴 Finding: `hydrate()`'s guard is not concurrency-safe — now [plan 019](019-hydrate-concurrency-latch.md)
+### ✅ Fixed: `hydrate()`'s guard was not concurrency-safe — [plan 019](019-hydrate-concurrency-latch.md)
 
 Surfaced by writing the E2E suite, which is the argument for having written it —
 no unit test could have reached this.
@@ -205,6 +205,32 @@ defeats 004 precisely in the scenario 004 was written for.
 Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
 **[019](019-hydrate-concurrency-latch.md)**, which points at `storage.ts`'s
 `schemaReady` as the in-repo exemplar for exactly this hazard.
+
+- **019 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Every criterion re-run
+  independently: `typecheck` 0, `check` 0 (still exactly 5 warnings), `test` 0
+  (14 files / **250** — 244 plus 6), `build` 0, and **`pnpm test:e2e` 3/3**, which
+  matters here because those specs cover the storage behaviour being changed.
+  Scope clean: `once.ts`, `once.test.ts`, and the two stores. Verified untouched:
+  `storage.ts`, `store-hydrator.tsx`, `next.config.ts`, `e2e/`,
+  `playwright.config.ts`, and `.claude/launch.json` (which the executor edited to
+  work around a port conflict and reverted before finishing — disclosed).
+  **Strict Mode is still on**; the fix is in the store, not in the diagnostic that
+  found it.
+  Read the diff: `--ignore-all-space` shows the `try` body byte-identical, only a
+  wrapper added. The implementation is better than the plan specified —
+  `runHydration` is a closure inside the store factory rather than a module-level
+  variable, so the latch is scoped to the store instance. `once()` clears the
+  cached promise in `.finally`, so a failure stays retryable, matching
+  `schemaReady`.
+  Commits `764e7e1`, `868b992` on `advisor/019-hydrate-concurrency-latch`.
+  **The regression evidence is the browser observation, not the unit tests**, and
+  the executor was explicit about that rather than implying otherwise. It seeded
+  IndexedDB with a stale-`parserVersion` record, reloaded under `next dev` with
+  Strict Mode on, then **git-stashed the fix and re-ran the same seed against the
+  pre-fix code**: 2 identical toasts before, 1 after. A real before/after, not an
+  assertion. The 6 new unit tests exercise the helper in isolation and would have
+  passed regardless of whether the store adopted it — which the plan asked it to
+  say plainly, and it did.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
