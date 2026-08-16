@@ -20,7 +20,7 @@ otherwise.
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
-| [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
+| [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | DONE (awaiting merge) |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
@@ -231,6 +231,35 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **009 — COMPLETE, reviewed, APPROVED. Awaiting merge.** The last P1. Five date
+  bugs, two new modules, a `TZ` pin. 262 → **288** tests across 17 files;
+  `typecheck`/`check`/`build` 0, `test:e2e` 3/3, still exactly 5 warnings. 14
+  files, all in scope.
+  **Red was observed in both test-first steps, and I confirmed it independently
+  rather than accepting the report.** Re-running `main`'s algorithm gives
+  `2026-03-03`, `2026-03-03`, `2023-03-01` where the new tests expect
+  `2026-02-28`, `2026-02-28`, `2023-02-28` — so those three genuinely fail
+  against the old code, in any timezone. For the `snapshotAgeDays` pair the
+  executor reported the actual received values (`9` where `8` was expected, `1`
+  where `0`), which is the shape of a real observation rather than an assertion.
+  It also probed the `TZ` pin's liveness with a throwaway test before relying on
+  it — the failure mode the plan warned about — then deleted the probe.
+  Verified untouched: `market-month.ts`, `metrics.ts`, `projection.ts`, and
+  **`clipboard.test.ts` byte-identical**, which is the proof that Step 7's
+  `todayStamp` refactor preserved behaviour. `resolveDateFrom` now constructs no
+  `Date` at all, and the `ytd` early return is intact.
+  *Judgment call, correct*: deleting the block the plan pointed at also removed
+  `const ALL = "all"`, which is independently used eight more times in the same
+  file as an unrelated "no filter" sentinel. That was already true at the
+  planning commit — the plan's excerpt simply didn't show it. The executor
+  restored a local copy with a distinguishing comment rather than stopping,
+  which is what the plan's own "typecheck catches a miss" note anticipated.
+  *Honest limitation, restated rather than glossed*: the `America/Toronto` pin is
+  west of Greenwich, so it reproduces four of the five bugs and the
+  west-of-Greenwich half of bug 5. The east-of-Greenwich half has no red test —
+  it is eliminated **structurally**, because the fixed function constructs no
+  `Date`. Documented in `date-range.test.ts` as well as here.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
