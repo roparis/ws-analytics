@@ -285,11 +285,14 @@ is what makes it the right home for the shared validator.
 ## Git workflow
 
 - Branch: `advisor/015-route-input-validation`
-- Three commits, one per concern. Messages in repo style (imperative,
-  sentence-case, no conventional-commit prefix):
+- One commit per concern — six, once Steps 7 and 8 were added. Messages in repo
+  style (imperative, sentence-case, no conventional-commit prefix):
   - `Validate a symbol as tightly as the ticker beside it`
-  - `Say that Yahoo failed without repeating what it said`
   - `Share one validator between the two routes that copy it`
+  - `Say that Yahoo failed without repeating what it said`
+  - `Reject cross-site requests to the price routes`
+  - `Give the history route its own lower symbol ceiling`
+  - plus any follow-up needed to satisfy the done criteria
 - Do NOT push or open a pull request unless the operator instructed it.
 
 ## Steps
