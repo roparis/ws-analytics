@@ -409,7 +409,12 @@ Stop and report back (do not improvise) if:
   is not a crash — it is a past year valued against a month that was cached
   under the wrong key. `src/lib/market-month.ts` exists because that already
   happened once. Rank Q3/Q4/Q7 accordingly.
-- **This plan reduces the pressure on the open-proxy item** in
-  `docs/yahoo-pricing-poc.md` §6 item 2 by removing load rather than policing
-  it. Worth noting in the design doc, since it makes the case for doing this
-  before rate limiting.
+- **This plan was written expecting to reduce the pressure on the open-proxy
+  item** in `docs/yahoo-pricing-poc.md` §6 item 2 by removing load rather than
+  policing it. **The spike found that claim needs qualifying.** Yahoo's chart
+  endpoint is one HTTP call per symbol *regardless of the requested range's
+  width*, so narrowing the range shrinks payloads, not request counts — only
+  skipping a symbol entirely removes a request. Caching therefore removes load
+  for someone clicking more than once inside a month (45 requests → 0), and
+  removes almost none for someone who clicks once a month. It is not a
+  substitute for the bounds plan 015 added.

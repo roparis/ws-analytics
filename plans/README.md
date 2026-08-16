@@ -28,7 +28,7 @@ otherwise.
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (awaiting merge) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
-| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
+| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (awaiting merge) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | TODO |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
@@ -131,6 +131,35 @@ document, not a feature. They must not modify production code.
   *Judgment call, accepted*: it did **not** name `ws-analytics.vercel.app` in the
   README, reasoning that naming it reads as endorsing public hosting, which the
   plan reserves for the maintainer. Sound — but see the follow-up finding below.
+
+- **007 — COMPLETE (spike), reviewed, APPROVED. Awaiting merge.** Deliverable is
+  `plans/007-history-caching-design.md` (477 lines). No production code touched —
+  confirmed: the only file in the diff is that document, and `typecheck` /
+  `check` / `test` (13 files / 244) / `build` are identical to `main`.
+  **Its central finding invalidates the naive framing of the feature, and mine.**
+  Yahoo's chart endpoint is **one HTTP call per symbol regardless of the
+  requested range's width** (`history/route.ts:172-176`, verified). So narrowing
+  `from` shrinks payloads, not request counts — a request disappears only when a
+  symbol is skipped **entirely**. That reshapes the whole design:
+  - A repeat click inside the same month: 45 requests → **0**. This is the win,
+    and it needs no merge logic at all — just an all-or-nothing skip gate.
+  - The first click after a month rolls over: **45 requests, unchanged**. Every
+    symbol still needs its new current month, and that is one request each
+    whatever the range. Only the payload shrinks.
+  So the recommended build is staged: a skip gate first, per-symbol narrowing
+  second, once the real skip rate is observable.
+  **Recommendation: client-side, and server-side actively not recommended** — with
+  a sharper argument than the plan had. A shared server-side cache would mean the
+  deployment *retains* which symbols were looked up, where today it only sees
+  them in transit. That is a second, larger step away from the app's promise, and
+  `https://ws-analytics.vercel.app` makes it concrete rather than hypothetical.
+  Commit `76054ab` on `advisor/007-history-caching-design`.
+  *Correction to this index and to plan 007's own maintenance notes*: I had
+  written that caching "removes most of the load behind the open-proxy concern"
+  and used it to argue for caching over rate limiting. That holds for someone
+  clicking repeatedly within a month and barely at all for someone clicking once
+  a month. It is **not** a substitute for the bounds 015 added. Corrected in
+  place.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
