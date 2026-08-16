@@ -1,3 +1,4 @@
+import { todayLocalIso } from "@/lib/calendar-date";
 import type { PriceSnapshot } from "@/lib/price-snapshot";
 
 /**
@@ -134,7 +135,7 @@ export const HISTORY_ENDPOINT = "/api/prices/history";
  */
 export function snapshotFromLivePrices(
 	response: LivePriceResponse,
-	asOf = new Date().toISOString().slice(0, 10),
+	asOf = todayLocalIso(),
 ): PriceSnapshot {
 	const pricesCad: Record<string, number> = {};
 	for (const quote of response.quotes) {

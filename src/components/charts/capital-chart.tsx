@@ -3,16 +3,13 @@
 import { useMemo, useState } from "react";
 import { Area, ComposedChart, Line, YAxis } from "recharts";
 import {
-	type DatePreset,
-	resolveDateFrom,
-} from "@/components/dashboard-filters";
-import {
 	type ChartConfig,
 	ChartContainer,
 	ChartTooltip,
 } from "@/components/ui/chart";
 import { Amount, HeadlineValue } from "@/components/ui/figures";
 import { type RangeOption, Segmented } from "@/components/ui/range-pills";
+import { type DatePreset, resolveDateFrom } from "@/lib/date-range";
 import {
 	type CapitalPoint,
 	capitalOverTime,

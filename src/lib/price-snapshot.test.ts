@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { todayLocalIso } from "@/lib/calendar-date";
 import { buildWorkbook, type Cell, SHEET_NAMES } from "@/lib/google-sheet";
 import { buildPositions } from "@/lib/positions";
 import {
@@ -183,6 +184,11 @@ describe("parsePriceCsv", () => {
 			),
 		).toThrow(PriceCsvError);
 	});
+
+	it("defaults asOf to today's local date", () => {
+		const csv = holdingsCsv({ ZAG: 11.5, VTI: 140, XEQT: 34.25 });
+		expect(parsePriceCsv(csv, "Holdings.csv").asOf).toBe(todayLocalIso());
+	});
 });
 
 describe("valueWith", () => {
@@ -260,15 +266,23 @@ describe("snapshotAgeDays", () => {
 		unpriced: [],
 	};
 
+	// Built from local components rather than a fixed UTC instant: a fixed
+	// instant's toISOString() is identical in every timezone, so it would agree
+	// with the bug this function used to have instead of catching it.
 	it("counts whole days since the prices were read", () => {
-		expect(snapshotAgeDays(snapshot, new Date("2026-08-09T12:00:00Z"))).toBe(8);
+		expect(snapshotAgeDays(snapshot, new Date(2026, 7, 9, 21, 0))).toBe(8);
 	});
 
 	it("is zero on the day it was taken", () => {
-		expect(snapshotAgeDays(snapshot, new Date("2026-08-01T23:00:00Z"))).toBe(0);
+		expect(snapshotAgeDays(snapshot, new Date(2026, 7, 1, 23, 0))).toBe(0);
 	});
 
 	it("never goes negative on a clock that disagrees", () => {
-		expect(snapshotAgeDays(snapshot, new Date("2026-07-20T00:00:00Z"))).toBe(0);
+		expect(snapshotAgeDays(snapshot, new Date(2026, 6, 20, 12, 0))).toBe(0);
+	});
+
+	it("is exact across the fall-back DST boundary", () => {
+		const fallSnapshot = { ...snapshot, asOf: "2026-10-30" };
+		expect(snapshotAgeDays(fallSnapshot, new Date(2026, 10, 3, 12, 0))).toBe(4);
 	});
 });

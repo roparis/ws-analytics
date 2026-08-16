@@ -26,6 +26,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { todayLocalIso } from "@/lib/calendar-date";
 import {
 	copyText,
 	downloadBlob,
@@ -95,7 +96,7 @@ export function ExportSheetDialog({
 			activities,
 			dataThrough,
 			fileName,
-			generatedOn: new Date().toISOString().slice(0, 10),
+			generatedOn: todayLocalIso(),
 			includeTransactionLog: includeLog,
 		});
 		const tsvBySheet = new Map(
