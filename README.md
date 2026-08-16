@@ -1,10 +1,19 @@
 # ws-analytics
 
-A lightweight open-source browser app for exploring Wealthsimple CSV data with charts, tables, and PDF export.
+A local-first tool for analysing a Wealthsimple activities export: cash flow, holdings, per-account and per-year analytics, retirement projections, and exports — all from a CSV, in your browser.
 
-This repository contains the self-hosted core: your data is parsed and analysed in the browser, with no external database and no file ever uploaded.
+By default this app is fully local: your CSV is parsed and analysed in the browser, with no external database and no file ever uploaded.
 
-> **On this branch (`WSA-006`)** there is one exception, and it is a proof of concept: live pricing sends *ticker symbols* — never share counts, amounts, or accounts — through this app's own server to Yahoo Finance. See [docs/yahoo-pricing-poc.md](docs/yahoo-pricing-poc.md). Without it, the app still has no backend at all.
+Live pricing is the one exception, and it's opt-in — a button you click, not something that runs automatically. When you use it, this app's own server asks Yahoo Finance for prices; the only thing that crosses the wire is a list of ticker symbols, e.g. `["VFV.TO", "VTI"]`. Never a share count, a book cost, an account id, or a file.
+
+| | Before live pricing | With live pricing |
+|---|---|---|
+| Activity CSV | Parsed in the tab, never uploaded | Unchanged — never uploaded |
+| Share counts, book cost, accounts | Derived in the tab | Unchanged — never sent |
+| Prices | Google Sheets, via a file you download and re-upload | Yahoo, via this app's own server process |
+| What crosses the wire | Nothing | **Ticker symbols only**, e.g. `["VFV.TO", "VTI"]` |
+
+Self-hosted (`pnpm dev`, or your own deployment), that server is your own machine, and the only outbound request is the app asking Yahoo about tickers. Deployed somewhere shared, it isn't: whoever runs that deployment can see which symbols were looked up, though never how many shares or in what account. See [docs/yahoo-pricing-poc.md](docs/yahoo-pricing-poc.md) for the detail.
 
 ## Quick start
 
@@ -19,22 +28,24 @@ Then open [http://localhost:3000](http://localhost:3000) and upload a `.csv` fil
 
 ## Features
 
-- Drag-and-drop or select CSV upload
-- Client-side parsing with [Papaparse](https://www.papaparse.com/)
-- Automatic column typing for numbers, dates, and text
-- Sortable, paginated data table
-- Auto-generated chart visualization with column selectors
+- Drag-and-drop CSV upload, parsed entirely in the browser with [Papaparse](https://www.papaparse.com/)
+- Timeline and dashboard views of account activity
+- Per-account and per-account-type detail pages
+- Year-by-year analytics, including unrealised gain
+- Retirement projections from account balances and assumptions you set
+- Multi-file merge with a coverage review across accounts
+- Holdings with average-cost basis and realised P&L
+- Live holding prices from Yahoo Finance (opt-in), or a Google Sheets round trip
+- Export an eight-tab XLSX workbook, importable straight into Google Sheets
 - Export the current view as a PDF report
-- Live holding prices from Yahoo Finance, or from a Google Sheets round trip
 - Dark/light theme support
 
 ## How it works
 
-1. Upload a CSV file.
-2. The browser parses the file and infers column types.
-3. Data is displayed in an interactive table.
-4. A chart is generated from the selected columns.
-5. Click `Export PDF` to download a report of the current table and chart.
+1. Upload a CSV file — it's parsed and analysed entirely in the browser.
+2. Browse the timeline, dashboard, and per-account pages, or merge in more files for a fuller history.
+3. Optionally fetch live prices, or export to Google Sheets and re-import, to value holdings against current markets.
+4. Export the XLSX workbook or a PDF report of the current view.
 
 ## Exporting Wealthsimple CSV data
 
@@ -88,15 +99,16 @@ pnpm check:write
 - Tailwind CSS v4
 - shadcn UI components on Base UI
 - Recharts for charting
-- TanStack Table for data tables
+- A hand-rolled data table (`src/components/data-table.tsx`) — sortable, with scroll-triggered batch loading instead of pagination
 - Zustand for client state
 - Papaparse for CSV parsing
-- jsPDF + html2canvas for PDF export
+- jsPDF + html2canvas-pro for PDF export (a fork used because the original chokes on this app's `oklch()` theme tokens; see `src/lib/pdf.ts`)
 - Biome for linting and formatting
 
 ## Project structure
 
 - `src/app/` — Next.js app routes and layouts
+- `src/app/api/` — the only server-side code in the app: the live-pricing routes (see the privacy note above)
 - `src/components/` — UI components and screens
 - `src/lib/` — data parsing, metrics, PDF export, utility helpers
 - `src/stores/` — application state logic
