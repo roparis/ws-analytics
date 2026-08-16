@@ -123,13 +123,15 @@ export async function POST(request: Request): Promise<Response> {
 
 		return Response.json(body, { headers: { "cache-control": "no-store" } });
 	} catch (error) {
-		console.warn("Yahoo Finance history failed:", error);
-		return fail(
-			`Yahoo Finance didn't answer: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-			502,
+		// Log the error's class and a symbol count, not `error.message` or the
+		// symbols themselves — that message is Yahoo's raw response body, which is
+		// not something to relay to an unauthenticated caller.
+		console.warn(
+			"Yahoo Finance history failed:",
+			error instanceof Error ? error.constructor.name : typeof error,
+			`for ${input.symbols.length} symbols`,
 		);
+		return fail("Yahoo Finance didn't answer. Try again in a moment.", 502);
 	}
 }
 
@@ -179,13 +181,11 @@ async function monthlyCloses(
 			currency: String(chart.meta.currency ?? "").toUpperCase(),
 			kind: "ok",
 		};
-	} catch (error) {
-		return {
-			kind: "miss",
-			reason: `Yahoo couldn't chart ${ticker}: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-		};
+	} catch {
+		// Not `error.message`: it's Yahoo's raw response body, and this reason
+		// ships in a 200. The ticker is already known here, which is the useful
+		// part — `historyFromResponse` discards `reason` anyway.
+		return { kind: "miss", reason: `Yahoo couldn't chart ${ticker}.` };
 	}
 }
 

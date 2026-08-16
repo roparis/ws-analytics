@@ -126,14 +126,16 @@ export async function POST(request: Request): Promise<Response> {
 	} catch (error) {
 		// Yahoo being down, rate-limiting, or changing its handshake are all
 		// normal operating conditions for an unofficial API. Say so plainly rather
-		// than leaving the page with a spinner and a stale snapshot.
-		console.warn("Yahoo Finance quote failed:", error);
-		return fail(
-			`Yahoo Finance didn't answer: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-			502,
+		// than leaving the page with a spinner and a stale snapshot. The error's
+		// class and a symbol count are logged, not `error.message` or the symbols
+		// themselves — that message is Yahoo's raw response body, which is not
+		// something to relay to an unauthenticated caller.
+		console.warn(
+			"Yahoo Finance quote failed:",
+			error instanceof Error ? error.constructor.name : typeof error,
+			`for ${symbols.length} symbols`,
 		);
+		return fail("Yahoo Finance didn't answer. Try again in a moment.", 502);
 	}
 }
 
