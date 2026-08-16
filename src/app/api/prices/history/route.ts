@@ -32,6 +32,22 @@ const yahooFinance = new YahooFinance({
 });
 
 export async function POST(request: Request): Promise<Response> {
+	// The only legitimate caller is this app's own browser code, posting JSON to
+	// a relative same-origin path. A browser attaches both headers checked here
+	// automatically, so this costs the real client nothing. `Sec-Fetch-Site` is
+	// rejected only when it is present and says otherwise — absent means a
+	// non-browser caller (the `curl` examples in `docs/yahoo-pricing-poc.md`
+	// §7), which this does not reject.
+	const secFetchSite = request.headers.get("sec-fetch-site");
+	if (secFetchSite && secFetchSite !== "same-origin") {
+		return fail("Cross-site requests aren't accepted.", 403);
+	}
+	if (
+		!(request.headers.get("content-type") ?? "").includes("application/json")
+	) {
+		return fail("Expected a JSON body.", 403);
+	}
+
 	let input: { symbols: PriceRequestSymbol[]; from: string; to: string };
 	try {
 		input = readRequest(await request.json());
