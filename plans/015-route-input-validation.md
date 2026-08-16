@@ -249,15 +249,27 @@ is what makes it the right home for the shared validator.
 - `src/app/api/prices/route.ts`
 - `src/app/api/prices/history/route.ts`
 
+**Also in scope — added after the app was found to be in production:**
+- An `Origin` / `Sec-Fetch-Site` check on both routes (Step 6)
+- A lower symbol ceiling on the **history** route specifically (Step 7)
+
+> **Why these moved in.** An earlier revision of this plan excluded both,
+> reasoning that they were near-worthless "for a local-first single-user run"
+> and that rate limiting "needs the unresolved hosting decision first". That
+> premise was wrong: `https://ws-analytics.vercel.app` has been serving
+> production since 2026-08-11, running this exact build. So
+> `docs/yahoo-pricing-poc.md` §6 item 2 — *"Deployed publicly they are an open
+> Yahoo proxy — and the history route is the expensive one"* — is describing
+> production, not a hypothetical.
+
 **Out of scope** (do NOT do these):
-- **Rate limiting.** Real and known — `docs/yahoo-pricing-poc.md` §6 item 2
-  records it. It needs the unresolved hosting decision first, and
-  `plans/007-history-caching-spike.md` argues caching removes most of the load
-  anyway.
-- **Origin / `Sec-Fetch-Site` / content-type checks.** Near-zero value for a
-  local-first single-user run, and they would break any non-browser caller
-  (including the `curl` examples in `docs/yahoo-pricing-poc.md` §7). If you want
-  to argue for them, do it in your report, not in the diff.
+- **A shared-store rate limiter** (Upstash, Redis, Vercel KV). It is the robust
+  answer and it introduces an infrastructure dependency this app has never had.
+  That is the maintainer's call, not an executor's. Steps 6 and 7 are the
+  no-new-infrastructure mitigations; if they are judged insufficient, the
+  follow-up is its own plan.
+- **Vercel WAF / firewall rules.** Platform configuration, not code, and not in
+  this repository.
 - **The `yahoo-finance2` library's own logging.** It calls `console.error(url)`
   on any non-OK response, with the ticker list in the query string. That is
   **not** suppressible by passing a custom logger — the call is not routed
@@ -385,7 +397,71 @@ below. This is the first test coverage either route's validation has ever had.
 
 **Verify**: `pnpm test live-prices` → all pass.
 
-### Step 7: Full verification
+### Step 6: Reject cross-site requests
+
+The only legitimate caller is this app's own browser code. Verified — the entire
+client side of both routes is `post` in `src/lib/live-prices.ts`:
+
+```ts
+	response = await fetch(endpoint, {
+		body: JSON.stringify(body),
+		headers: { "content-type": "application/json" },
+		method: "POST",
+	});
+```
+
+with relative same-origin endpoints (`/api/prices`, `/api/prices/history`). A
+browser attaches `Origin` and `Sec-Fetch-Site` automatically to that request, so
+a check costs the real client nothing.
+
+Add to both handlers, before `request.json()`: reject when `Sec-Fetch-Site` is
+present and is not `same-origin`, and reject when `Content-Type` is not JSON.
+Return 403 with the same `{ error }` body shape the routes already use — the
+client degrades gracefully on any non-OK status
+(`src/lib/live-prices.ts` reads `parsed.error`, falling back to a status-code
+message).
+
+Note the content-type half matters on its own: `Request.json()` parses the body
+regardless of declared type, so a cross-site form-style POST never triggers a
+CORS preflight today.
+
+**This is the cheapest meaningful mitigation for a public deployment** — it
+closes the path where a third-party page makes its visitors' browsers drive your
+Yahoo quota, without the attacker needing to know the deployment URL from their
+own server.
+
+**Trade-off to state in your report**: it breaks non-browser callers, including
+the `curl` examples in `docs/yahoo-pricing-poc.md` §7. Those examples send
+`content-type: application/json` so they pass that half, but they send no
+`Sec-Fetch-Site`, so the "present and not same-origin" wording matters — an
+absent header must be **allowed**, or you break every `curl`. Get that condition
+right and say in your report which requests you confirmed still pass.
+
+**Verify**: `pnpm typecheck && pnpm build` → exit 0.
+
+### Step 7: Cut the history route's amplification
+
+The history route issues **one upstream Yahoo request per symbol**, plus one for
+FX. At the shared `MAX_SYMBOLS = 100` that is up to 101 upstream requests for a
+single inbound request — a 100× amplification, and the concrete reason the POC
+doc calls this route "the expensive one".
+
+`MAX_SYMBOLS` is shared by both routes today. The quote route genuinely answers
+100 symbols in **one** upstream round trip, so its cap is fine. Introduce a
+separate, lower ceiling for the history route only.
+
+Pick the number from the app's real usage, not from thin air: `tickersFor`
+produces one entry per distinct held symbol, and the POC doc's worked example is
+a 44-holding portfolio. A ceiling around **60** leaves real portfolios untouched
+while halving the worst case. State the number you chose and why in your report.
+
+Keep `MAX_SYMBOLS` itself unchanged — the quote route and the client-side
+`guard` both use it, and lowering it would reject legitimate quote requests.
+
+**Verify**: `pnpm test` → exit 0, and the new ceiling is unit-tested alongside
+the shared validator from Step 2.
+
+### Step 8: Full verification
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check && pnpm build` → exit 0.
 
@@ -439,6 +515,11 @@ Machine-checkable. ALL must hold:
       either route file
 - [ ] `grep -n "concurrency" src/app/api/prices/history/route.ts` still shows `4`
 - [ ] `grep -n "MAX_SYMBOLS = " src/lib/live-prices.ts` still shows `100`
+      (unchanged — the quote route and the client guard both use it)
+- [ ] Both routes reject a request whose `Sec-Fetch-Site` is `cross-site`
+- [ ] Both routes still accept a request with **no** `Sec-Fetch-Site` header
+      (the `curl` examples in `docs/yahoo-pricing-poc.md` §7 must keep working)
+- [ ] The history route enforces its own lower symbol ceiling, unit-tested
 - [ ] `git status --short` lists only the four in-scope files
 - [ ] `plans/README.md` status row for 015 updated
 
@@ -453,9 +534,11 @@ Stop and report back (do not improvise) if:
   ticker-shaped values.
 - Cases 10 and 11 pass before Step 3 lands. They should fail — passing means
   they are not testing the new bound.
-- You conclude the fix needs a request body size limit, an origin check, or rate
-  limiting to be worth doing. All three are deliberately out of scope; argue in
-  your report if you disagree.
+- An origin check would reject the app's own client. Report what header the real
+  request actually carries rather than loosening the check until it passes.
+- You conclude the mitigations in Steps 6 and 7 are insufficient and a shared
+  store (Redis/Upstash/Vercel KV) is required. Say so and stop — adding an
+  infrastructure dependency is the maintainer's decision.
 - You find yourself trying to suppress `yahoo-finance2`'s internal
   `console.error(url)`. It is not routed through the configurable logger and
   cannot be suppressed that way — report it rather than attempting a workaround.

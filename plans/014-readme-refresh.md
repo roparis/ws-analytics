@@ -319,10 +319,16 @@ Stop and report back (do not improvise) if:
   something other than ticker symbols and two dates reaches
   `src/app/api/prices/*`. That would be a serious finding and must be reported
   rather than documented.
-- You conclude the README should say the app is safe to deploy publicly. It
-  should not: `docs/yahoo-pricing-poc.md` §6 records that decision as open, and
-  the routes have no rate limiting. Describe the self-hosted case and state the
-  shared-deployment caveat; do not resolve the question.
+- You conclude the README should recommend deploying this publicly, or should
+  claim the hosted instance is hardened. It is not — the routes still have no
+  rate limiting (`plans/015` addresses that).
+  **Note the premise changed**: an earlier revision of this plan told you not to
+  resolve the hosting question. It is resolved — `https://ws-analytics.vercel.app`
+  has served production since 2026-08-11 and is set as this repository's
+  homepage. So the README must describe **both** cases honestly: self-hosted,
+  the server is the reader's own machine; on the hosted instance, their ticker
+  symbols pass through someone else's deployment. Saying only the first would
+  now be misleading.
 - You find yourself editing a file under `src/` to make a README claim true.
 
 ## Maintenance notes

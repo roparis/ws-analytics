@@ -106,6 +106,37 @@ document, not a feature. They must not modify production code.
   node test environment, so this is established structurally. Reproducing it
   needs a browser, a slow read, and a drop inside the window.
 
+## ⚠️ This app is in production — a premise several plans got wrong
+
+Discovered 2026-08-16 while opening PRs: `https://ws-analytics.vercel.app` is
+this repository's homepage and has served **12 production deployments** since
+2026-08-11, running this exact build — both API routes included.
+
+The original audit and several plans reasoned as though the hosting question
+from `docs/yahoo-pricing-poc.md` §6 were open. It is resolved in practice, and
+that changes real conclusions:
+
+- **015** excluded rate limiting and origin checks as near-worthless "for a
+  local-first single-user run". Wrong premise. §6 item 2 — *"Deployed publicly
+  they are an open Yahoo proxy — and the history route is the expensive one"* —
+  describes production. The history route turns **one inbound request into up to
+  101 upstream Yahoo requests** (one per symbol at `MAX_SYMBOLS`, plus FX),
+  unauthenticated and unthrottled. 015 now includes an origin check and a lower
+  history-route ceiling; a shared-store rate limiter is flagged as a maintainer
+  decision, not an executor's.
+- **007** preferred client-side caching partly because hosting was "undecided".
+  That reason is gone; the privacy argument for client-side remains and is now
+  the actual one.
+- **014** was told not to resolve the hosting question. It must now describe
+  both cases: self-hosted, the server is your own machine; on the hosted
+  instance, a user's tickers pass through someone else's deployment.
+- **Account IDs in URL paths** (below) now reach Vercel's access logs, and a
+  **CSP** (deferred) is more relevant than when it was assessed.
+
+Honest bound on the risk: nothing user-derived is stored server-side, so this is
+cost and IP-reputation exposure — your Vercel invocations, and Yahoo potentially
+refusing the deployment — not a data breach.
+
 ## Dependency notes
 
 **Hard dependency**
