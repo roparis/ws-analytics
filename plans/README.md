@@ -17,7 +17,7 @@ otherwise.
 |------|-------|----------|--------|------------|--------|
 | [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (merged) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
-| [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
+| [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | DONE (awaiting merge) |
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
@@ -231,6 +231,37 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **003 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Baseline 261 → **262**;
+  `typecheck` 0, `check` 0 (5 warnings), `build` 0, `test:e2e` 3/3. Six files,
+  all in scope.
+  Verified by reading the diff:
+  - The `NODE_ENV` gate is gone (`grep` over `src/lib/` → no matches), and the
+    invariant `console.warn` is **deleted, not un-gated** — those messages name
+    accounts and balances, so they belong on screen rather than in a console.
+  - `parseActivities` still `resolve`s. A violation warns; it never blocks a file
+    from loading.
+  - `validateDataset`'s body and `wealthsimple.test.ts` are byte-identical to
+    `main`.
+  - **004's `failed` handling and 005's `hydrated` guard both survive** — both
+    live in files this plan edits, and both are untouched.
+  - The merge page caps the per-file list at 20 with "…and N more"; the sidebar
+    card surfaces a count and widens the compact indicator to
+    `conflicts > 0 || flagged > 0`.
+  Commit `2f1bc8d` on `advisor/003-invariants-in-production`.
+  **This closes a documented promise.** `docs/wealthsimple-csv-format.md` §9 has
+  claimed since it was written that the invariants "run against the *real* file at
+  parse time… the same checks run automatically the moment you load it." Until
+  now they ran in neither the production build nor anywhere a user could see.
+  *Not exercised*: no violation was observed, because there is no real export to
+  run against — `.gitignore` excludes every CSV by design, and the synthetic e2e
+  fixture is built to satisfy I1/I2/I5. The check is wired and reaches the UI; it
+  has not been watched firing. First real export to trip it is the confirmation.
+
+*Reconciliation done before dispatch*: 004 and 005 had changed two of the files
+this plan quotes, so its "Current state" excerpts were stale. Refreshed against
+`1c78fe7` and marked as such, rather than handing an executor a plan whose own
+drift check would have told it to stop.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
