@@ -33,7 +33,7 @@ otherwise.
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (awaiting merge) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
-| [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
+| [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | DONE (awaiting merge) |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale — finding fixed independently or
@@ -231,6 +231,34 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **017 — COMPLETE, reviewed, APPROVED. Awaiting merge.** One file, one
+  `await import()`. 293 tests, `test:e2e` 3/3, 5 warnings, `typecheck` 0.
+  **The measurement is the deliverable, and it is decisive.** `/dashboard`'s
+  referenced chunks drop from **2,039,400 to 1,374,898 bytes — 664,502 bytes
+  (~33%)**. I reproduced the after-figure independently: 15 chunks,
+  1,374,898 bytes to the byte, and **no referenced chunk contains
+  jspdf/html2canvas** where one did before. The split is real, not a dynamic
+  import the bundler inlined.
+  *Plan defect the executor found and worked around correctly*: Step 3 told it to
+  read "First Load JS" from the build output. **Next.js 16 removed that metric** —
+  confirmed verbatim in `node_modules/next/dist/docs/…/version-16.md:989`
+  ("removes the `size` and `First Load JS` metrics… We found these to be
+  inaccurate in server-driven architectures"). Rather than report a number the
+  build no longer prints, it substituted a more precise one — summing the bytes
+  of every chunk the compiled route's HTML references, cross-checked against
+  which chunk holds the libraries. Better than what the plan asked for.
+  *Second correction to me*: I told it all three cited files were unchanged.
+  `dashboard.tsx` had drifted 7 lines — **`main` moved under me mid-dispatch**
+  when #31 and #32 merged. It investigated rather than stopping, established the
+  drift was 009's unrelated import swap and that both in-scope files matched
+  verbatim, and proceeded. Correct call.
+  *Genuinely useful finding*: `next dev` (Turbopack) **eagerly prefetches the
+  dynamic chunk at page load** — reproduced twice — so the "requested at click
+  time" check fails in dev and passes in production. It verified against a real
+  `next start` build, where the chunk is fetched strictly after the click. Worth
+  knowing before anyone concludes the split is broken by testing in dev.
+  Commit `06ca689` on `advisor/017-pdf-code-splitting`.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
