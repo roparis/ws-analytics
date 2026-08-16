@@ -23,7 +23,7 @@ otherwise.
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
-| [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
+| [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | DONE (awaiting merge) |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
@@ -231,6 +231,30 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **011 — COMPLETE, reviewed, APPROVED. Awaiting merge.** 262 → **267**;
+  `typecheck`/`check`/`build` 0, `test:e2e` 3/3, 5 warnings. Two files.
+  **The trap was avoided.** `lastEventDate` is private to `Pool` — **zero**
+  occurrences on the public `Position` interface — `lastTradeDate` is still
+  assigned only inside the `Trade` branch, and the closed-position sort and
+  account roll-ups that consume it are untouched. Widening that field would have
+  silently changed both.
+  **Red was observed**: 3 of 5 new tests failed before the fix, asserting
+  `2026-03-01` and getting `2024-02-01` — the stale last-trade date. The executor
+  reported the actual received value, which is the shape of a real observation.
+  `positions.test.ts` has **additions only** (0 deleted lines), so the
+  realisation-sum invariant is untouched and still asserted in both places.
+  `analytics.ts` untouched — the date was fixed at its source, not at the
+  bucketing.
+  Commit `74addc2` on `advisor/011-closing-writeoff-date`.
+  *Step 4 judgment, sound*: the plan flagged the empty-date guard as needing care,
+  since dropping an undated realisation after `realizedPnl` was already
+  decremented would break the sum invariant. Rather than assume, the executor
+  traced reachability — a pool is only created with ≥1 row, `lastEventDate` is
+  assigned unconditionally before any `continue`, and rows with an empty
+  `transactionDate` are filtered at parse time — and concluded the branch is dead
+  in practice. It added the guard anyway as defence. That is the right order:
+  establish reachability, then decide.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
