@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { once } from "@/lib/once";
 import type { PriceHistory } from "@/lib/price-history";
 import type { PriceSnapshot } from "@/lib/price-snapshot";
 import {
@@ -44,14 +45,12 @@ interface PriceState {
 	reset: () => void;
 }
 
-export const usePriceStore = create<PriceState>((set, get) => ({
-	snapshot: null,
-	history: null,
-	hydrated: false,
-	persistFailed: false,
-
-	hydrate: async () => {
-		if (get().hydrated) return;
+export const usePriceStore = create<PriceState>((set, get) => {
+	// Not reachable today — this `set` is an idempotent overwrite, so a second
+	// concurrent caller just writes the same values again. Latched anyway so
+	// this store doesn't diverge from `dataset.ts`, which has the identical
+	// check-then-act shape and, unlike this one, an unsafe `set`.
+	const runHydration = once(async () => {
 		try {
 			const [snapshot, history] = await Promise.all([
 				loadPriceSnapshot(),
@@ -63,39 +62,51 @@ export const usePriceStore = create<PriceState>((set, get) => ({
 			// page falls back to book cost, which is what it did before.
 			set({ hydrated: true, history: null, snapshot: null });
 		}
-	},
+	});
 
-	setSnapshot: (snapshot) => {
-		set({ snapshot });
-		// The write is best-effort, as it is in `dataset.ts` — the session keeps
-		// working either way. But it is *reported*: swallowing the error would
-		// leave someone believing their prices are saved when they will be gone
-		// on reload, which is worse than losing them loudly.
-		void savePriceSnapshot(snapshot).catch((error) => {
-			console.warn("Could not save prices to local storage:", error);
-			set({ persistFailed: true });
-		});
-	},
+	return {
+		snapshot: null,
+		history: null,
+		hydrated: false,
+		persistFailed: false,
 
-	setHistory: (history) => {
-		set({ history });
-		void savePriceHistory(history).catch((error) => {
-			console.warn("Could not save price history to local storage:", error);
-			set({ persistFailed: true });
-		});
-	},
+		hydrate: async () => {
+			if (get().hydrated) return;
+			await runHydration();
+		},
 
-	clear: () => {
-		set({ history: null, persistFailed: false, snapshot: null });
-		void savePriceSnapshot(null).catch((error) => {
-			console.warn("Could not clear stored prices:", error);
-		});
-		void savePriceHistory(null).catch((error) => {
-			console.warn("Could not clear stored price history:", error);
-		});
-	},
+		setSnapshot: (snapshot) => {
+			set({ snapshot });
+			// The write is best-effort, as it is in `dataset.ts` — the session keeps
+			// working either way. But it is *reported*: swallowing the error would
+			// leave someone believing their prices are saved when they will be gone
+			// on reload, which is worse than losing them loudly.
+			void savePriceSnapshot(snapshot).catch((error) => {
+				console.warn("Could not save prices to local storage:", error);
+				set({ persistFailed: true });
+			});
+		},
 
-	reset: () => {
-		set({ history: null, persistFailed: false, snapshot: null });
-	},
-}));
+		setHistory: (history) => {
+			set({ history });
+			void savePriceHistory(history).catch((error) => {
+				console.warn("Could not save price history to local storage:", error);
+				set({ persistFailed: true });
+			});
+		},
+
+		clear: () => {
+			set({ history: null, persistFailed: false, snapshot: null });
+			void savePriceSnapshot(null).catch((error) => {
+				console.warn("Could not clear stored prices:", error);
+			});
+			void savePriceHistory(null).catch((error) => {
+				console.warn("Could not clear stored price history:", error);
+			});
+		},
+
+		reset: () => {
+			set({ history: null, persistFailed: false, snapshot: null });
+		},
+	};
+});
