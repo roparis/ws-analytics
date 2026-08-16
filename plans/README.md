@@ -15,11 +15,11 @@ otherwise.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (awaiting merge) |
+| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (merged) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
-| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (awaiting merge) |
-| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (awaiting merge) |
+| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
+| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
@@ -55,8 +55,8 @@ document, not a feature. They must not modify production code.
   `verify` 0 from clean. Scope clean — only `.github/workflows/ci.yml` (new) and
   two script lines in `package.json`; nothing under `src/`, `biome.jsonc`
   untouched, no dependency moved.
-  Commit `7034784` on branch `advisor/001-ci-workflow`, cut from `1d09a07`.
-  **Not merged and not pushed** — that is the maintainer's decision.
+  Commit `7034784`, **merged via PR #17**. Its first real CI run passed in 52s,
+  which is the end-to-end confirmation the local review could not give.
   *Unproven until it runs*: the workflow has never executed on GitHub. Local
   verification simulates what CI does but cannot confirm
   `pnpm/action-setup@v4` resolving the `packageManager` field, or the
@@ -70,8 +70,7 @@ document, not a feature. They must not modify production code.
   never writes `ORDER_KEY`; `hydrate` no longer calls `saveSources` (the one
   remaining mention inside it is the explanatory comment), while `addSources`
   and `removeSource` still do, correctly.
-  Commit `38cfca1` on branch `advisor/004-preserve-unparseable-sources`, cut
-  from `1d09a07`. **Not merged and not pushed.**
+  Commit `38cfca1`, **merged via PR #18** together with 005.
   *Plan defect found by the executor*: Step 1 predicted `pnpm typecheck` would
   fail until Step 3. It does not — TypeScript permits destructuring a subset of
   a widened return type. The executor flagged the mismatch rather than forcing
@@ -93,8 +92,7 @@ document, not a feature. They must not modify production code.
   re-persists `get().sources`, the merged list, not the list read from disk; and
   plan 004's `failed` handling and `updateSources` call both survived intact.
   Commit `a4a1c9e` on branch `advisor/005-gate-uploader-on-hydration`,
-  **stacked on `advisor/004-preserve-unparseable-sources`** (`38cfca1` confirmed
-  as an ancestor). **Not merged and not pushed.**
+  stacked on 004 (`38cfca1` confirmed as an ancestor). **Merged via PR #18.**
   *Authoring lesson*: the dispatch carried a done criterion asserting
   `grep -c "updateSources" src/stores/dataset.ts` returns 2. It returns 4 — one
   import, one call, and two mentions of the symbol *in prose comments* that the
