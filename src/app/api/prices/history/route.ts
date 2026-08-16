@@ -1,11 +1,12 @@
 import YahooFinance from "yahoo-finance2";
 import {
 	type LivePriceMiss,
-	MAX_SYMBOLS,
+	MAX_HISTORY_SYMBOLS,
 	type PriceHistoryRequest,
 	type PriceHistoryResponse,
 	type PriceHistorySeries,
 	type PriceRequestSymbol,
+	readRequestSymbols,
 } from "@/lib/live-prices";
 import { marketMonth } from "@/lib/market-month";
 import { USD_CAD_TICKER } from "@/lib/yahoo-ticker";
@@ -32,6 +33,22 @@ const yahooFinance = new YahooFinance({
 });
 
 export async function POST(request: Request): Promise<Response> {
+	// The only legitimate caller is this app's own browser code, posting JSON to
+	// a relative same-origin path. A browser attaches both headers checked here
+	// automatically, so this costs the real client nothing. `Sec-Fetch-Site` is
+	// rejected only when it is present and says otherwise — absent means a
+	// non-browser caller (the `curl` examples in `docs/yahoo-pricing-poc.md`
+	// §7), which this does not reject.
+	const secFetchSite = request.headers.get("sec-fetch-site");
+	if (secFetchSite && secFetchSite !== "same-origin") {
+		return fail("Cross-site requests aren't accepted.", 403);
+	}
+	if (
+		!(request.headers.get("content-type") ?? "").includes("application/json")
+	) {
+		return fail("Expected a JSON body.", 403);
+	}
+
 	let input: { symbols: PriceRequestSymbol[]; from: string; to: string };
 	try {
 		input = readRequest(await request.json());
@@ -123,13 +140,15 @@ export async function POST(request: Request): Promise<Response> {
 
 		return Response.json(body, { headers: { "cache-control": "no-store" } });
 	} catch (error) {
-		console.warn("Yahoo Finance history failed:", error);
-		return fail(
-			`Yahoo Finance didn't answer: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-			502,
+		// Log the error's class and a symbol count, not `error.message` or the
+		// symbols themselves — that message is Yahoo's raw response body, which is
+		// not something to relay to an unauthenticated caller.
+		console.warn(
+			"Yahoo Finance history failed:",
+			error instanceof Error ? error.constructor.name : typeof error,
+			`for ${input.symbols.length} symbols`,
 		);
+		return fail("Yahoo Finance didn't answer. Try again in a moment.", 502);
 	}
 }
 
@@ -179,13 +198,11 @@ async function monthlyCloses(
 			currency: String(chart.meta.currency ?? "").toUpperCase(),
 			kind: "ok",
 		};
-	} catch (error) {
-		return {
-			kind: "miss",
-			reason: `Yahoo couldn't chart ${ticker}: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-		};
+	} catch {
+		// Not `error.message`: it's Yahoo's raw response body, and this reason
+		// ships in a 200. The ticker is already known here, which is the useful
+		// part — `historyFromResponse` discards `reason` anyway.
+		return { kind: "miss", reason: `Yahoo couldn't chart ${ticker}.` };
 	}
 }
 
@@ -195,17 +212,11 @@ function readRequest(body: unknown): {
 	to: string;
 } {
 	const input = body as PriceHistoryRequest | null;
-	const symbols = input?.symbols;
-
-	if (!Array.isArray(symbols)) {
-		throw new Error("Expected a JSON body with a `symbols` array.");
-	}
-	if (symbols.length === 0) {
-		throw new Error("No symbols to chart.");
-	}
-	if (symbols.length > MAX_SYMBOLS) {
-		throw new Error(`At most ${MAX_SYMBOLS} symbols per request.`);
-	}
+	const symbols = readRequestSymbols(
+		input?.symbols,
+		"chart",
+		MAX_HISTORY_SYMBOLS,
+	);
 
 	const from = isoDate(input?.from);
 	const to = isoDate(input?.to);
@@ -216,23 +227,7 @@ function readRequest(body: unknown): {
 		throw new Error("`from` is after `to`.");
 	}
 
-	return {
-		from,
-		to,
-		symbols: symbols.map((entry) => {
-			const symbol =
-				typeof entry?.symbol === "string" ? entry.symbol.trim() : "";
-			const ticker =
-				typeof entry?.ticker === "string" ? entry.ticker.trim() : "";
-			if (!symbol || !ticker) {
-				throw new Error("Every entry needs a `symbol` and a `ticker`.");
-			}
-			if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(ticker)) {
-				throw new Error(`"${ticker}" isn't a ticker.`);
-			}
-			return { symbol, ticker };
-		}),
-	};
+	return { from, symbols, to };
 }
 
 function isoDate(value: unknown): string | null {

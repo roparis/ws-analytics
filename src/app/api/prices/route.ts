@@ -2,10 +2,9 @@ import YahooFinance from "yahoo-finance2";
 import {
 	type LivePriceMiss,
 	type LivePriceQuote,
-	type LivePriceRequest,
 	type LivePriceResponse,
-	MAX_SYMBOLS,
 	type PriceRequestSymbol,
+	readRequestSymbols,
 } from "@/lib/live-prices";
 import { USD_CAD_TICKER } from "@/lib/yahoo-ticker";
 
@@ -44,9 +43,25 @@ const yahooFinance = new YahooFinance({
 });
 
 export async function POST(request: Request): Promise<Response> {
+	// The only legitimate caller is this app's own browser code, posting JSON to
+	// a relative same-origin path. A browser attaches both headers checked here
+	// automatically, so this costs the real client nothing. `Sec-Fetch-Site` is
+	// rejected only when it is present and says otherwise — absent means a
+	// non-browser caller (the `curl` examples in `docs/yahoo-pricing-poc.md`
+	// §7), which this does not reject.
+	const secFetchSite = request.headers.get("sec-fetch-site");
+	if (secFetchSite && secFetchSite !== "same-origin") {
+		return fail("Cross-site requests aren't accepted.", 403);
+	}
+	if (
+		!(request.headers.get("content-type") ?? "").includes("application/json")
+	) {
+		return fail("Expected a JSON body.", 403);
+	}
+
 	let symbols: PriceRequestSymbol[];
 	try {
-		symbols = readSymbols(await request.json());
+		symbols = readRequestSymbols((await request.json())?.symbols, "quote");
 	} catch (error) {
 		return fail(error instanceof Error ? error.message : "Bad request.", 400);
 	}
@@ -127,43 +142,17 @@ export async function POST(request: Request): Promise<Response> {
 	} catch (error) {
 		// Yahoo being down, rate-limiting, or changing its handshake are all
 		// normal operating conditions for an unofficial API. Say so plainly rather
-		// than leaving the page with a spinner and a stale snapshot.
-		console.warn("Yahoo Finance quote failed:", error);
-		return fail(
-			`Yahoo Finance didn't answer: ${
-				error instanceof Error ? error.message : "unknown error"
-			}`,
-			502,
+		// than leaving the page with a spinner and a stale snapshot. The error's
+		// class and a symbol count are logged, not `error.message` or the symbols
+		// themselves — that message is Yahoo's raw response body, which is not
+		// something to relay to an unauthenticated caller.
+		console.warn(
+			"Yahoo Finance quote failed:",
+			error instanceof Error ? error.constructor.name : typeof error,
+			`for ${symbols.length} symbols`,
 		);
+		return fail("Yahoo Finance didn't answer. Try again in a moment.", 502);
 	}
-}
-
-/** Parses the body defensively — this is the app's only untrusted input. */
-function readSymbols(body: unknown): PriceRequestSymbol[] {
-	const symbols = (body as LivePriceRequest | null)?.symbols;
-	if (!Array.isArray(symbols)) {
-		throw new Error("Expected a JSON body with a `symbols` array.");
-	}
-	if (symbols.length === 0) {
-		throw new Error("No symbols to quote.");
-	}
-	if (symbols.length > MAX_SYMBOLS) {
-		throw new Error(`At most ${MAX_SYMBOLS} symbols per request.`);
-	}
-
-	return symbols.map((entry) => {
-		const symbol = stringOrNull(entry?.symbol)?.trim();
-		const ticker = stringOrNull(entry?.ticker)?.trim();
-		if (!symbol || !ticker) {
-			throw new Error("Every entry needs a `symbol` and a `ticker`.");
-		}
-		// Tickers go into a query string; Yahoo's own alphabet is letters, digits
-		// and `.-=^`, so anything else is a caller doing something else.
-		if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(ticker)) {
-			throw new Error(`"${ticker}" isn't a ticker.`);
-		}
-		return { symbol, ticker };
-	});
 }
 
 /**

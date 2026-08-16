@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	type LivePriceQuote,
 	type LivePriceResponse,
+	MAX_HISTORY_SYMBOLS,
+	MAX_SYMBOLS,
+	readRequestSymbols,
 	snapshotFromLivePrices,
 } from "@/lib/live-prices";
 
@@ -102,5 +105,133 @@ describe("snapshotFromLivePrices", () => {
 		);
 
 		expect(snapshot.quotedAt).toBeUndefined();
+	});
+});
+
+describe("readRequestSymbols", () => {
+	it("returns every entry, trimmed", () => {
+		expect(
+			readRequestSymbols(
+				[
+					{ symbol: "VFV", ticker: "VFV.TO" },
+					{ symbol: "BTC", ticker: "BTC-CAD" },
+				],
+				"quote",
+			),
+		).toEqual([
+			{ symbol: "VFV", ticker: "VFV.TO" },
+			{ symbol: "BTC", ticker: "BTC-CAD" },
+		]);
+	});
+
+	it("rejects a body whose `symbols` isn't an array", () => {
+		expect(() => readRequestSymbols({ not: "an array" }, "quote")).toThrow(
+			/symbols/,
+		);
+	});
+
+	it("rejects an empty array, naming the noun", () => {
+		expect(() => readRequestSymbols([], "chart")).toThrow(/chart/);
+	});
+
+	it("rejects more than MAX_SYMBOLS entries, naming the cap", () => {
+		const symbols = Array.from({ length: MAX_SYMBOLS + 1 }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(() => readRequestSymbols(symbols, "quote")).toThrow(
+			new RegExp(String(MAX_SYMBOLS)),
+		);
+	});
+
+	it("accepts exactly MAX_SYMBOLS entries — the boundary is inclusive", () => {
+		const symbols = Array.from({ length: MAX_SYMBOLS }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(readRequestSymbols(symbols, "quote")).toHaveLength(MAX_SYMBOLS);
+	});
+
+	it("rejects an entry missing `ticker`", () => {
+		expect(() => readRequestSymbols([{ symbol: "VFV" }], "quote")).toThrow();
+	});
+
+	it("rejects an entry missing `symbol`", () => {
+		expect(() => readRequestSymbols([{ ticker: "VFV.TO" }], "quote")).toThrow();
+	});
+
+	it("rejects a ticker with a disallowed character", () => {
+		expect(() =>
+			readRequestSymbols([{ symbol: "VFV", ticker: "VFV.TO!" }], "quote"),
+		).toThrow();
+	});
+
+	it("rejects a ticker longer than 20 characters", () => {
+		expect(() =>
+			readRequestSymbols([{ symbol: "VFV", ticker: "A".repeat(21) }], "quote"),
+		).toThrow();
+	});
+
+	it("rejects a symbol longer than 20 characters — the new bound", () => {
+		expect(() =>
+			readRequestSymbols(
+				[{ symbol: "S".repeat(21), ticker: "VFV.TO" }],
+				"quote",
+			),
+		).toThrow();
+	});
+
+	it("rejects a symbol with a disallowed character — the new bound", () => {
+		expect(() =>
+			readRequestSymbols([{ symbol: "VFV!", ticker: "VFV.TO" }], "quote"),
+		).toThrow();
+	});
+
+	it("trims surrounding whitespace on both fields", () => {
+		expect(
+			readRequestSymbols(
+				[{ symbol: "  VFV  ", ticker: "  VFV.TO  " }],
+				"quote",
+			),
+		).toEqual([{ symbol: "VFV", ticker: "VFV.TO" }]);
+	});
+
+	it("accepts every ticker shape tickersFor can produce", () => {
+		// Derived from src/lib/yahoo-ticker.ts: `.TO` suffix for `ca` listings
+		// (class shares hyphenated), bare for US listings (also hyphenated), and
+		// a `-CAD` suffix for crypto. USDCAD=X is the FX pair the routes add
+		// alongside whatever the caller asked for.
+		const shapes = ["VFV.TO", "CTC-A.TO", "BRK-B", "BTC-CAD", "USDCAD=X"];
+		const symbols = shapes.map((ticker) => ({ symbol: ticker, ticker }));
+		expect(readRequestSymbols(symbols, "quote")).toHaveLength(shapes.length);
+	});
+
+	it("still accepts up to MAX_SYMBOLS when no override is passed", () => {
+		const symbols = Array.from({ length: MAX_SYMBOLS }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(readRequestSymbols(symbols, "quote")).toHaveLength(MAX_SYMBOLS);
+	});
+
+	it("rejects more than a passed-in maxSymbols, even under MAX_SYMBOLS", () => {
+		const symbols = Array.from({ length: MAX_HISTORY_SYMBOLS + 1 }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(symbols.length).toBeLessThan(MAX_SYMBOLS);
+		expect(() =>
+			readRequestSymbols(symbols, "chart", MAX_HISTORY_SYMBOLS),
+		).toThrow(new RegExp(String(MAX_HISTORY_SYMBOLS)));
+	});
+
+	it("accepts exactly a passed-in maxSymbols — the boundary is inclusive", () => {
+		const symbols = Array.from({ length: MAX_HISTORY_SYMBOLS }, (_, i) => ({
+			symbol: `S${i}`,
+			ticker: `T${i}`,
+		}));
+		expect(
+			readRequestSymbols(symbols, "chart", MAX_HISTORY_SYMBOLS),
+		).toHaveLength(MAX_HISTORY_SYMBOLS);
 	});
 });

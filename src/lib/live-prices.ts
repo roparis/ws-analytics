@@ -106,6 +106,18 @@ export interface PriceHistoryResponse {
  */
 export const MAX_SYMBOLS = 100;
 
+/**
+ * The history route's own, lower ceiling.
+ *
+ * Unlike the quote route, history costs one upstream Yahoo request *per
+ * symbol* plus one for FX — at `MAX_SYMBOLS` that's up to 101 upstream
+ * requests for a single inbound one. `tickersFor` emits one entry per
+ * distinct held symbol, and the worked example in
+ * `docs/yahoo-pricing-poc.md` is a 44-holding portfolio, so 60 leaves real
+ * portfolios untouched while roughly halving the worst-case amplification.
+ */
+export const MAX_HISTORY_SYMBOLS = 60;
+
 /** Where the browser sends its list. */
 export const PRICES_ENDPOINT = "/api/prices";
 
@@ -187,6 +199,61 @@ export async function fetchPriceHistory(
 		symbols,
 		to,
 	} satisfies PriceHistoryRequest);
+}
+
+// Tickers go into a query string; Yahoo's own alphabet is letters, digits and
+// `.-=^`, so anything else is a caller doing something else. `symbol` gets the
+// same bound: it is echoed back in every quote, miss and history series, and
+// retained through the whole upstream fan-out, so an unbounded one would be
+// reflected output and retained memory for no benefit — every symbol this app
+// produces (`tickersFor`, in `yahoo-ticker.ts`) is already ticker-shaped.
+const TICKER_SHAPE = /^[A-Za-z0-9.=^-]{1,20}$/;
+
+/**
+ * Validates the `symbols` array both routes take.
+ *
+ * Extracted rather than duplicated: the two routes carried byte-identical
+ * copies of these checks, including the ticker pattern, which is exactly the
+ * kind of thing that drifts silently. `noun` only varies the error wording
+ * ("quote" vs "chart"), which is the sole difference the copies actually had.
+ *
+ * `maxSymbols` defaults to `MAX_SYMBOLS` but lets the history route pass its
+ * own, lower `MAX_HISTORY_SYMBOLS` — the two routes' amplification differs by
+ * two orders of magnitude, so they don't share one ceiling.
+ */
+export function readRequestSymbols(
+	symbols: unknown,
+	noun: string,
+	maxSymbols: number = MAX_SYMBOLS,
+): PriceRequestSymbol[] {
+	if (!Array.isArray(symbols)) {
+		throw new Error("Expected a JSON body with a `symbols` array.");
+	}
+	if (symbols.length === 0) {
+		throw new Error(`No symbols to ${noun}.`);
+	}
+	if (symbols.length > maxSymbols) {
+		throw new Error(`At most ${maxSymbols} symbols per request.`);
+	}
+
+	return symbols.map((entry) => {
+		const symbol = stringOrNull(entry?.symbol)?.trim();
+		const ticker = stringOrNull(entry?.ticker)?.trim();
+		if (!symbol || !ticker) {
+			throw new Error("Every entry needs a `symbol` and a `ticker`.");
+		}
+		if (!TICKER_SHAPE.test(ticker)) {
+			throw new Error(`"${ticker}" isn't a ticker.`);
+		}
+		if (!TICKER_SHAPE.test(symbol)) {
+			throw new Error(`"${symbol}" isn't a symbol.`);
+		}
+		return { symbol, ticker };
+	});
+}
+
+function stringOrNull(value: unknown): string | null {
+	return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function guard(symbols: PriceRequestSymbol[]): void {
