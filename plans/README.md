@@ -25,8 +25,8 @@ otherwise.
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
-| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | TODO |
-| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (awaiting merge) |
+| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (awaiting merge) |
+| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
@@ -104,6 +104,34 @@ document, not a feature. They must not modify production code.
   node test environment, so this is established structurally. Reproducing it
   needs a browser, a slow read, and a drop inside the window.
 
+- **014 — COMPLETE, reviewed, APPROVED. Awaiting merge.** README-only; no code
+  touched, and the gates confirm it: `typecheck` 0, `check` 0 (5 warnings),
+  `test` 0 (13 files / 244 — identical before and after the edit), `build` 0.
+  All four documented defects verified as still present before being fixed, and
+  every replacement claim checked against `package.json` or `src/`:
+  - TanStack Table removed — it is in no manifest and no source file. Replaced
+    with an accurate description of the hand-rolled `src/components/data-table.tsx`.
+  - `html2canvas` → `html2canvas-pro`, with the reason, so nobody "simplifies"
+    back to the library that was removed *because every export failed*.
+  - The `WSA-006` branch-scoped privacy caveat is gone.
+  - The feature list is rebuilt from the route table; the "eight-tab XLSX" claim
+    was traced through `buildWorkbook` (7 sheets plus the transaction log, which
+    defaults on) rather than asserted.
+  The privacy section now describes **both** cases, which is the point of the
+  change: self-hosted, the server is your own machine; deployed somewhere shared,
+  the operator can see which symbols were looked up — never how many shares or in
+  what account. It makes no hardening claim, which stays accurate: `grep -rni
+  "rate.?limit" src/app/api/` finds nothing but comments.
+  Commit `fc1af01` on `advisor/014-readme-refresh`.
+  *Briefing error the executor caught*: it was told PR #20 was unmerged. #20 had
+  merged mid-run, so the real baseline was 244 tests, not the 228 it was given.
+  It verified rather than trusted, confirmed the substantive guidance still held,
+  and reported the discrepancy. Fourth time an executor has caught a stale claim
+  of mine — the pattern is worth the paranoia.
+  *Judgment call, accepted*: it did **not** name `ws-analytics.vercel.app` in the
+  README, reasoning that naming it reads as endorsing public hosting, which the
+  plan reserves for the maintainer. Sound — but see the follow-up finding below.
+
 ## ⚠️ This app is in production — a premise several plans got wrong
 
 Discovered 2026-08-16 while opening PRs: `https://ws-analytics.vercel.app` is
@@ -154,9 +182,8 @@ refusing the deployment — not a data breach.
     `ticker` and `symbol`.
   - No upstream text reaches a client. The 502 handlers log error class and a
     symbol count; the per-symbol miss names only the ticker.
-  Commit range `c6ad2d5..764ee67` (6 commits) on branch
-  `advisor/015-route-input-validation`, from `origin/main`. **Not merged, not
-  pushed.**
+  Commit range `c6ad2d5..764ee67` (6 commits), **merged via PR #20**; CI green in
+  45s.
   *Residual, accepted*: the two 400 paths still interpolate the app's own
   validation message, which echoes the rejected value — and a value that failed
   the shape test is by definition unbounded. It is JSON-encoded, returned only to
@@ -171,6 +198,19 @@ refusing the deployment — not a data breach.
   cross-site abuse is blocked and the worst-case amplification drops from ~101 to
   ~61 upstream requests — but a determined same-origin caller is still
   unthrottled. A shared-store limiter remains a maintainer decision.
+
+### Follow-up this surfaced: the deployed app tells its users nothing
+
+Plan 014 fixed the **README**, which lives on GitHub. Someone who arrives at
+`https://ws-analytics.vercel.app` and uploads a CSV never sees it. The running
+app does not say that it is a shared deployment, that live pricing is opt-in, or
+that clicking it sends their ticker symbols through someone else's server.
+
+The README now states all three — to an audience that may not be the one using
+the hosted instance. An in-app disclosure is a different change with a different
+surface (a line near the uploader, or beside the live-prices button) and is not
+covered by any current plan. Worth deciding on deliberately rather than by
+default, given the app's whole premise is where the data goes.
 
 ## Dependency notes
 
