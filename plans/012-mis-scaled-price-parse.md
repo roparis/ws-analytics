@@ -7,10 +7,10 @@
 > in `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat d1d2640..HEAD -- src/lib/price-snapshot.ts`
-> If the file changed since this plan was written, compare the "Current state"
-> excerpt against the live code before proceeding; on a mismatch, treat it as a
-> STOP condition.
+> `git diff --stat 99fa8b4..HEAD -- src/lib/price-snapshot.ts src/lib/price-snapshot.test.ts`
+> If either file changed since this plan was reconciled, compare the "Current
+> state" excerpts against the live code before proceeding; on a mismatch, treat
+> it as a STOP condition.
 
 ## Status
 
@@ -20,6 +20,11 @@
 - **Depends on**: none
 - **Category**: bug
 - **Planned at**: commit `d1d2640`, 2026-08-15
+- **Reconciled at**: commit `99fa8b4`, 2026-08-16 — `plans/009` has since landed
+  and edited this same file (`asOf` default, `snapshotAgeDays`). `toNumber` is
+  **byte-for-byte unchanged**; only line numbers moved, and every excerpt below
+  is re-verified against `99fa8b4`. The test-count baseline and the Step 2
+  fixture guidance were also corrected — see the notes in those steps.
 
 ## Why this matters
 
@@ -43,7 +48,7 @@ which is a plausible default for a high-priced instrument.
 
 ## Current state
 
-Verified excerpt, `src/lib/price-snapshot.ts:125-146`:
+Verified excerpt, `src/lib/price-snapshot.ts:127-145`:
 
 ```ts
 /**
@@ -80,7 +85,7 @@ Note the last row: a multi-comma integer already fails safely, because
 
 ### The only guard the value passes
 
-Verified excerpt, `src/lib/price-snapshot.ts:96-101`:
+Verified excerpt, `src/lib/price-snapshot.ts:98-102`:
 
 ```ts
 		const price = toNumber(row[COLUMNS.priceCad]);
@@ -112,7 +117,7 @@ correct failure mode, and it is where an unreadable price should go.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Typecheck | `pnpm typecheck` | exit 0 |
-| Tests | `pnpm test` | exit 0, 228 baseline + new |
+| Tests | `pnpm test` | exit 0, your measured baseline + new |
 | One file | `pnpm test price-snapshot` | all pass |
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 
@@ -125,9 +130,10 @@ correct failure mode, and it is where an unreadable price should go.
 **Out of scope** (do NOT touch):
 - `parsePriceCsv`'s header detection, the `Total`-row skip, the `unpriced`
   handling, or the `price <= 0` guard. All correct.
-- The `asOf` default at `src/lib/price-snapshot.ts:69` and `snapshotAgeDays` at
-  `:234-243` — those are `plans/009`'s. If 009 has landed, leave its changes
-  alone; if it has not, do not fix them here.
+- The `asOf` default at `src/lib/price-snapshot.ts:70` and `snapshotAgeDays` at
+  `:236-241` — those were `plans/009`'s, **and 009 has landed**. Both now call
+  `todayLocalIso` from `@/lib/calendar-date`. Leave them exactly as they are;
+  they are correct and they are not this plan's concern.
 - `src/lib/google-sheet.ts` — the *writer* side. Changing what the sheet emits
   is a different change with a different risk profile, and would not help a
   user whose sheet is already formatted.
@@ -146,19 +152,57 @@ correct failure mode, and it is where an unreadable price should go.
 
 ### Step 1: Record the baseline
 
-**Verify**: `pnpm typecheck && pnpm test && pnpm check` → exit 0, with
-`Tests 228 passed (228)`. If the count differs, the tree has drifted — STOP.
+Run `pnpm typecheck && pnpm test && pnpm check` and **write down the numbers you
+actually observe** — the passing test count, the file count, and the warning
+count. Do not take a count from this document: several plans have shipped since
+it was written and the suite has grown. Your measured numbers are the baseline
+every later step compares against.
+
+**Verify**: all three exit 0. At the time of reconciliation this was
+`Tests 293 passed (293)` across 17 files and 5 warnings, but treat that as
+context, not as an assertion — a different number is drift to note, not a
+failure to stop on. Stop only if something **fails**.
 
 ### Step 2: Write the failing test first
 
 Add to `src/lib/price-snapshot.test.ts` a case asserting that a
 thousands-grouped integer price is **not** read as a fraction.
 
-`toNumber` is private, so assert through the public `parsePriceCsv`: build a
-minimal Holdings CSV whose `Price (CAD)` cell is `95,000` for one symbol, and
-assert that symbol's parsed price. Follow the existing fixtures in that file for
-the CSV shape — it needs the `Symbol` and `Price (CAD)` header columns that
-`parsePriceCsv` looks for (`price-snapshot.ts:74-76`).
+`toNumber` is private, so assert through the public `parsePriceCsv`.
+
+**Do not hand-write a CSV.** The test file already has the right tool: a
+`holdingsCsv(prices)` helper (`price-snapshot.test.ts:80`) that builds the
+fixture from `buildWorkbook` — the real exporter — so a column rename fails here
+rather than in someone's browser. Use it.
+
+Its parameter is typed `Record<string, number | "">`, so you cannot pass the
+string `"95,000"` through it. The file already solves this, at
+`price-snapshot.test.ts:162-171`: build with an ordinary numeric price, then
+string-replace that one cell with the formatted variant.
+
+```ts
+	it("reads a price the sheet formatted with a currency symbol", () => {
+		const csv = holdingsCsv({ ZAG: 11.5, VTI: 140, XEQT: 34.25 }).replace(
+			",11.5,",
+			',"$1,211.50",',
+		);
+		expect(parsePriceCsv(csv, "Holdings.csv").pricesCad.ZAG).toBeCloseTo(
+			1211.5,
+			6,
+		);
+	});
+```
+
+Two details that will cost you an hour if you miss them:
+
+- **The replacement must be quoted.** A bare `95,000` in a CSV is two columns,
+  and Papaparse will read it as such — you would be testing the CSV quoting
+  rules, not `toNumber`. Write `',"95,000",'`, exactly as the excerpt above
+  quotes `"$1,211.50"`.
+- **The `.replace` target must be unique in the document.** `replace` swaps only
+  the first match; pick prices for the three symbols that cannot collide with
+  each other or with any other number the workbook emits, and assert on the
+  symbol you actually replaced.
 
 **Run `pnpm test price-snapshot` and confirm it FAILS**, reporting `95`.
 
@@ -197,7 +241,8 @@ Add the remaining cases from the table in Step 3 plus the ones in the Test plan
 below, so the rule is pinned in both directions — a decimal comma must still
 work, and a group separator must not be eaten.
 
-**Verify**: `pnpm test` → exit 0, all 228 pre-existing plus your new cases.
+**Verify**: `pnpm test` → exit 0, your Step 1 baseline plus your new cases, with
+nothing previously passing now failing.
 
 ### Step 5: Full verification
 
@@ -236,13 +281,13 @@ these are already covered, extend rather than duplicate.
 Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
-- [ ] `pnpm test` exits 0; all 228 pre-existing tests pass, plus at least 6 new
-      cases
+- [ ] `pnpm test` exits 0; every test in your Step 1 baseline still passes, plus
+      at least 6 new cases
 - [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
       `src/lib/google-sheet.ts`
 - [ ] `grep -n "A comma is a decimal separator only when no dot is present" src/lib/price-snapshot.ts`
       returns no matches — the old rule's comment is gone
-- [ ] `git diff d1d2640..HEAD -- src/lib/google-sheet.ts` shows **no changes**
+- [ ] `git diff 99fa8b4..HEAD -- src/lib/google-sheet.ts` shows **no changes**
 - [ ] `git status --short` lists only `src/lib/price-snapshot.ts` and
       `src/lib/price-snapshot.test.ts`
 - [ ] `plans/README.md` status row for 012 updated
@@ -277,10 +322,12 @@ For whoever owns this next:
 - **The writer side is untouched**, so a sheet whose cells are formatted to zero
   decimals will keep producing `95,000`. After this change it parses correctly
   rather than needing the user to reformat.
-- **Reconciliation**: `plans/009` also edits `src/lib/price-snapshot.ts` — the
-  `asOf` default at `:69` and `snapshotAgeDays` at `:234-243`, both different
-  functions from `toNumber`. No line overlap, but whichever lands second should
-  re-read the file before editing.
+- **Reconciliation (resolved)**: `plans/009` also edited
+  `src/lib/price-snapshot.ts` and landed first, in PR #31. It touched the `asOf`
+  default (`:70`) and `snapshotAgeDays` (`:236-241`), both different functions
+  from `toNumber`, which it left byte-for-byte unchanged. The excerpts in this
+  plan were re-verified against `99fa8b4` after that merge; nothing but line
+  numbers moved.
 - **What a reviewer should scrutinise**: that all four European/Anglo formatting
   regressions are covered; that the dot-present branch is still evaluated first;
   and that the executor reports having *seen the new case fail* first.
