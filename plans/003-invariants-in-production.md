@@ -19,7 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none. Landing 002 first is recommended but not required.
 - **Category**: bug
-- **Planned at**: commit `d1d2640`, 2026-08-15
+- **Planned at**: commit `d1d2640`, 2026-08-15; **excerpts re-verified at `1c78fe7`, 2026-08-16**
 
 ## Why this matters
 
@@ -138,11 +138,15 @@ export interface SourceSummary {
 
 ### Where the persisted path rebuilds a `SourceFile`
 
-Verified excerpt, `src/lib/storage.ts:167-184`:
+> **Re-verified on `main` at `1c78fe7`.** Plan 004 has since landed and changed
+> this function — it now collects `failed` names and no longer has a bare empty
+> catch. The excerpt below is the **current** code. Only the first branch matters
+> for this plan.
 
 ```ts
 		let reparsed = 0;
 		const sources: SourceFile[] = [];
+		const failed: string[] = [];
 		for (const entry of ordered) {
 			if (entry.parserVersion === PARSER_VERSION) {
 				sources.push({
@@ -156,10 +160,18 @@ Verified excerpt, `src/lib/storage.ts:167-184`:
 				sources.push(await parseActivities(entry.rawText, entry.fileName));
 				reparsed++;
 			} catch {
-				// A file that no longer parses is dropped rather than blocking startup.
+				// The raw text stays in the database: it is the only copy, and a
+				// parser fix later may well read it. Dropping it from this session's
+				// list keeps startup working; deleting it would not be recoverable.
+				failed.push(entry.fileName);
 			}
 		}
+
+		return { sources, reparsed, failed };
 ```
+
+**Do not touch the `failed` handling** — that is plan 004's, it is live, and it
+is what stops a file being deleted when it stops parsing.
 
 Note the first branch constructs a `SourceFile` **without** going through
 `parseActivities`, so it will not have `problems` unless you compute them there.
@@ -169,7 +181,13 @@ bump `PARSER_VERSION`** — recomputing is always fresh and needs no schema chan
 
 ### The UI pattern to match
 
-Verified excerpt, `src/components/data-source-card.tsx:26-33` and `:84-97`:
+> **Re-verified on `main` at `1c78fe7`.** Plan 005 has since landed and added a
+> `hydrated` guard **above** these derivations, so line numbers have shifted and
+> the component now returns a `Skeleton` before reaching any of this. The
+> derivations themselves are unchanged. **Leave the `hydrated` guard exactly as
+> it is** — it is what closes the mid-hydration data-loss window.
+
+Verified excerpt, the derivations and the warning block:
 
 ```tsx
 	const conflicts = dataset.sources.filter(
@@ -236,9 +254,10 @@ rendered only when something is below `high` confidence:
 - `src/lib/storage.ts`
 - `src/components/data-source-card.tsx`
 - `src/app/merge/page.tsx`
-- `src/lib/merge.test.ts` — **only if plan 002 has landed**, to keep its
-  fixtures compiling. If 002 has not landed, this file does not exist and you
-  create nothing.
+- `src/lib/merge.test.ts` — **002 has landed, so this file exists and will need
+  its fixture factory updated.** Its `makeSource` helper constructs a
+  `SourceFile`; add `problems: []` to its default. Do not add assertions about
+  `problems` there — merge does not compute them, it only carries them.
 
 **Out of scope** (do NOT touch, even though they look related):
 - The body of `validateDataset` itself (`src/lib/wealthsimple.ts:~150-265`).
@@ -420,14 +439,14 @@ second category of footnote, not replacing the first.
 
 **Verify**: `pnpm check` → exit 0.
 
-### Step 6: Update the fixtures in plan 002's tests, if that plan landed
+### Step 6: Update the fixtures in plan 002's tests
 
-If `src/lib/merge.test.ts` exists, its `makeSource` helper now needs a
-`problems` field. Add `problems: []` to the helper's default. Do not add
-assertions about `problems` here — merge does not compute them, it only carries
-them.
+`src/lib/merge.test.ts` exists (plan 002, merged). Its `makeSource` helper
+constructs a `SourceFile` and now needs `problems: []` in its default, or the
+file will not compile.
 
-If `src/lib/merge.test.ts` does not exist, skip this step.
+Do not add assertions about `problems` here — merge does not compute them, it
+only carries them through.
 
 **Verify**: `pnpm test` → exit 0.
 
