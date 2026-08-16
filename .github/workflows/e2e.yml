@@ -1,0 +1,40 @@
+name: E2E
+
+# Deliberately its own workflow file rather than a second job in ci.yml: the
+# fast `verify` gate in ci.yml runs on every push to every branch, and this
+# suite — a full production build plus a browser download — should not add
+# to that runtime. Scoping the trigger to `pull_request` here keeps the two
+# gates independent without touching ci.yml at all.
+on:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Chromium only — this suite tests IndexedDB/storage behaviour, not
+      # cross-browser rendering. See playwright.config.ts.
+      - name: Install Playwright's Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
