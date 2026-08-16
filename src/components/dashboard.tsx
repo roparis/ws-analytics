@@ -4,15 +4,12 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { AccountGroupList } from "@/components/accounts/account-group-list";
 import { ActivitiesTable } from "@/components/activities-table";
 import { CapitalChart } from "@/components/charts/capital-chart";
-import {
-	DashboardFilters,
-	type DatePreset,
-	resolveDateFrom,
-} from "@/components/dashboard-filters";
+import { DashboardFilters } from "@/components/dashboard-filters";
 import { KpiCards } from "@/components/kpi-cards";
 import { MoneyFlow } from "@/components/money-flow";
 import { PdfExportButton } from "@/components/pdf-export-button";
 import { type Earned, earnedFrom, NO_EARNINGS } from "@/lib/analytics";
+import { type DatePreset, resolveDateFrom } from "@/lib/date-range";
 import {
 	type ActivityFilters,
 	computeKpis,

@@ -8,37 +8,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { DATE_PRESETS, type DatePreset } from "@/lib/date-range";
 import type { ActivityFilters } from "@/lib/metrics";
 import type { ActivityDataset } from "@/lib/wealthsimple";
 
-export const DATE_PRESETS = [
-	{ value: "all", label: "All dates" },
-	{ value: "30d", label: "Last 30 days" },
-	{ value: "3m", label: "Last 3 months" },
-	{ value: "6m", label: "Last 6 months" },
-	{ value: "12m", label: "Last 12 months" },
-	{ value: "ytd", label: "Year to date" },
-] as const;
-
-export type DatePreset = (typeof DATE_PRESETS)[number]["value"];
-
+// The sentinel value for "no filter selected" in the activity-type and
+// account selects below. Unrelated to date-range.ts's own "all" preset —
+// coincidentally the same string, kept local since it never leaves this file.
 const ALL = "all";
-
-export function resolveDateFrom(
-	preset: DatePreset,
-	datasetEnd: string,
-): string | null {
-	if (preset === ALL || !datasetEnd) return null;
-	if (preset === "ytd") return `${datasetEnd.slice(0, 4)}-01-01`;
-
-	const end = new Date(`${datasetEnd}T00:00:00`);
-	if (preset === "30d") end.setDate(end.getDate() - 30);
-	else if (preset === "3m") end.setMonth(end.getMonth() - 3);
-	else if (preset === "6m") end.setMonth(end.getMonth() - 6);
-	else if (preset === "12m") end.setMonth(end.getMonth() - 12);
-
-	return end.toISOString().slice(0, 10);
-}
 
 interface DashboardFiltersProps {
 	dataset: ActivityDataset;
