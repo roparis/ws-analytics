@@ -21,7 +21,7 @@ otherwise.
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
-| [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
+| [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | DONE (awaiting merge) |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
@@ -231,6 +231,29 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **013 — COMPLETE, reviewed, APPROVED. Awaiting merge.** `AGENTS.md` only, purely
+  additive (112 insertions, **0 deletions** — verified). Both
+  `nextjs-agent-rules` markers intact and the generated block byte-identical, so
+  `next dev` will not clobber the new section. Gates unchanged, as they must be
+  for a docs change: 261 tests, `test:e2e` 3/3, `typecheck`/`check` 0.
+  I read the section rather than trusting the line count. It does what the plan
+  asked: one line per rule, each stating the *consequence* not just the rule,
+  each pointing at the doc section carrying the evidence, FX leading. The framing
+  line is the one that matters — *"when this summary and the doc disagree, the
+  doc wins"* — which is what keeps a summary from quietly becoming a second
+  source of truth.
+  Commit on `advisor/013-agents-domain-knowledge`.
+  *Plan defect the executor found*: the plan's prose says the FX rule is restated
+  in "six" inline comments while its own evidence list enumerates seven. I
+  checked — the list is right. It didn't affect the output, since no count is
+  restated in `AGENTS.md`, and the executor flagged it rather than silently
+  picking one. It also corrected a line range it was given
+  (`history/route.ts:28-31` → `:29-32`) rather than copying it verbatim.
+  *Why this was worth doing*: eleven dispatches into this backlog, every single
+  executor had to be hand-supplied the same domain rules in its prompt, because
+  they lived only in `docs/` with nothing pointing at them. That is now a file an
+  agent reads first, and `CLAUDE.md`'s one-line `@AGENTS.md` import picks it up.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
