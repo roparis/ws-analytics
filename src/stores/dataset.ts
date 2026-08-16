@@ -58,12 +58,45 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
 		if (get().hydrated) return;
 		try {
 			const { sources, reparsed, failed } = await loadSources();
-			set({ ...withSources(sources), hydrated: true });
-			// Rows re-derived under a newer parser are written back so the next
-			// load is a straight read. `updateSources`, not `saveSources`: a file
-			// that failed to re-parse is missing from `sources` but must stay in
-			// the database, and a wholesale replace would delete it.
-			if (reparsed > 0) persist(updateSources(sources));
+			let raced = false;
+
+			set((state) => {
+				if (state.sources.length === 0) {
+					return { ...withSources(sources), hydrated: true };
+				}
+
+				// Files were added while IndexedDB was being read. `addSources`
+				// wrote them over a list it believed was empty, so the stored
+				// copies of everything else have already been cleared. Put the
+				// stored files back in front — the order `addSources` would have
+				// produced had the read finished first — and re-persist the union
+				// below.
+				raced = true;
+				const added = new Set(state.sources.map((source) => source.fileName));
+				const restored = sources.filter(
+					(source) => !added.has(source.fileName),
+				);
+				return {
+					...withSources([...restored, ...state.sources]),
+					hydrated: true,
+				};
+			});
+
+			if (raced) {
+				// The one case that wants the wholesale replace: after merging, the
+				// store owns the complete set, and the database is missing whatever
+				// `addSources` cleared. This covers any re-parsed rows too, so it
+				// replaces rather than accompanies the `updateSources` call below —
+				// two overlapping writes would race each other.
+				persist(saveSources(get().sources));
+			} else if (reparsed > 0) {
+				// Rows re-derived under a newer parser are written back so the next
+				// load is a straight read. `updateSources`, not `saveSources`: a file
+				// that failed to re-parse is missing from `sources` but must stay in
+				// the database, and a wholesale replace would delete it.
+				persist(updateSources(sources));
+			}
+
 			if (failed.length > 0) reportFailedSources(failed);
 		} catch (error) {
 			console.warn("Could not read local storage:", error);
