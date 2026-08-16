@@ -15,22 +15,22 @@ otherwise.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (awaiting merge) |
+| [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (merged) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
-| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (awaiting merge) |
-| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (awaiting merge) |
+| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
+| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
-| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | TODO |
-| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | TODO |
+| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (awaiting merge) |
+| [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
-| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
+| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (awaiting merge) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
-| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | TODO |
+| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE — partial (awaiting merge) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
 
@@ -55,8 +55,8 @@ document, not a feature. They must not modify production code.
   `verify` 0 from clean. Scope clean — only `.github/workflows/ci.yml` (new) and
   two script lines in `package.json`; nothing under `src/`, `biome.jsonc`
   untouched, no dependency moved.
-  Commit `7034784` on branch `advisor/001-ci-workflow`, cut from `1d09a07`.
-  **Not merged and not pushed** — that is the maintainer's decision.
+  Commit `7034784`, **merged via PR #17**. Its first real CI run passed in 52s,
+  which is the end-to-end confirmation the local review could not give.
   *Unproven until it runs*: the workflow has never executed on GitHub. Local
   verification simulates what CI does but cannot confirm
   `pnpm/action-setup@v4` resolving the `packageManager` field, or the
@@ -70,8 +70,7 @@ document, not a feature. They must not modify production code.
   never writes `ORDER_KEY`; `hydrate` no longer calls `saveSources` (the one
   remaining mention inside it is the explanatory comment), while `addSources`
   and `removeSource` still do, correctly.
-  Commit `38cfca1` on branch `advisor/004-preserve-unparseable-sources`, cut
-  from `1d09a07`. **Not merged and not pushed.**
+  Commit `38cfca1`, **merged via PR #18** together with 005.
   *Plan defect found by the executor*: Step 1 predicted `pnpm typecheck` would
   fail until Step 3. It does not — TypeScript permits destructuring a subset of
   a widened return type. The executor flagged the mismatch rather than forcing
@@ -93,8 +92,7 @@ document, not a feature. They must not modify production code.
   re-persists `get().sources`, the merged list, not the list read from disk; and
   plan 004's `failed` handling and `updateSources` call both survived intact.
   Commit `a4a1c9e` on branch `advisor/005-gate-uploader-on-hydration`,
-  **stacked on `advisor/004-preserve-unparseable-sources`** (`38cfca1` confirmed
-  as an ancestor). **Not merged and not pushed.**
+  stacked on 004 (`38cfca1` confirmed as an ancestor). **Merged via PR #18.**
   *Authoring lesson*: the dispatch carried a done criterion asserting
   `grep -c "updateSources" src/stores/dataset.ts` returns 2. It returns 4 — one
   import, one call, and two mentions of the symbol *in prose comments* that the
@@ -105,6 +103,106 @@ document, not a feature. They must not modify production code.
   *Not verified*: the race itself. `hydrate` reads IndexedDB, absent from the
   node test environment, so this is established structurally. Reproducing it
   needs a browser, a slow read, and a drop inside the window.
+
+- **014 — COMPLETE, reviewed, APPROVED. Awaiting merge.** README-only; no code
+  touched, and the gates confirm it: `typecheck` 0, `check` 0 (5 warnings),
+  `test` 0 (13 files / 244 — identical before and after the edit), `build` 0.
+  All four documented defects verified as still present before being fixed, and
+  every replacement claim checked against `package.json` or `src/`:
+  - TanStack Table removed — it is in no manifest and no source file. Replaced
+    with an accurate description of the hand-rolled `src/components/data-table.tsx`.
+  - `html2canvas` → `html2canvas-pro`, with the reason, so nobody "simplifies"
+    back to the library that was removed *because every export failed*.
+  - The `WSA-006` branch-scoped privacy caveat is gone.
+  - The feature list is rebuilt from the route table; the "eight-tab XLSX" claim
+    was traced through `buildWorkbook` (7 sheets plus the transaction log, which
+    defaults on) rather than asserted.
+  The privacy section now describes **both** cases, which is the point of the
+  change: self-hosted, the server is your own machine; deployed somewhere shared,
+  the operator can see which symbols were looked up — never how many shares or in
+  what account. It makes no hardening claim, which stays accurate: `grep -rni
+  "rate.?limit" src/app/api/` finds nothing but comments.
+  Commit `fc1af01` on `advisor/014-readme-refresh`.
+  *Briefing error the executor caught*: it was told PR #20 was unmerged. #20 had
+  merged mid-run, so the real baseline was 244 tests, not the 228 it was given.
+  It verified rather than trusted, confirmed the substantive guidance still held,
+  and reported the discrepancy. Fourth time an executor has caught a stale claim
+  of mine — the pattern is worth the paranoia.
+  *Judgment call, accepted*: it did **not** name `ws-analytics.vercel.app` in the
+  README, reasoning that naming it reads as endorsing public hosting, which the
+  plan reserves for the maintainer. Sound — but see the follow-up finding below.
+
+- **007 — COMPLETE (spike), reviewed, APPROVED. Awaiting merge.** Deliverable is
+  `plans/007-history-caching-design.md` (477 lines). No production code touched —
+  confirmed: the only file in the diff is that document, and `typecheck` /
+  `check` / `test` (13 files / 244) / `build` are identical to `main`.
+  **Its central finding invalidates the naive framing of the feature, and mine.**
+  Yahoo's chart endpoint is **one HTTP call per symbol regardless of the
+  requested range's width** (`history/route.ts:172-176`, verified). So narrowing
+  `from` shrinks payloads, not request counts — a request disappears only when a
+  symbol is skipped **entirely**. That reshapes the whole design:
+  - A repeat click inside the same month: 45 requests → **0**. This is the win,
+    and it needs no merge logic at all — just an all-or-nothing skip gate.
+  - The first click after a month rolls over: **45 requests, unchanged**. Every
+    symbol still needs its new current month, and that is one request each
+    whatever the range. Only the payload shrinks.
+  So the recommended build is staged: a skip gate first, per-symbol narrowing
+  second, once the real skip rate is observable.
+  **Recommendation: client-side, and server-side actively not recommended** — with
+  a sharper argument than the plan had. A shared server-side cache would mean the
+  deployment *retains* which symbols were looked up, where today it only sees
+  them in transit. That is a second, larger step away from the app's promise, and
+  `https://ws-analytics.vercel.app` makes it concrete rather than hypothetical.
+  Commit `76054ab` on `advisor/007-history-caching-design`.
+  *Correction to this index and to plan 007's own maintenance notes*: I had
+  written that caching "removes most of the load behind the open-proxy concern"
+  and used it to argue for caching over rate limiting. That holds for someone
+  clicking repeatedly within a month and barely at all for someone clicking once
+  a month. It is **not** a substitute for the bounds 015 added. Corrected in
+  place.
+
+- **018 — PARTIAL, reviewed, APPROVED. Awaiting merge.** Three specs, all green;
+  I ran the suite three times independently — 3/3 each, 4.5s, one worker, no
+  flakes. Scope clean: `src/` untouched (empty diff), the existing `ci.yml`
+  untouched, no CSV committed, no `.gitignore` exception, Vitest still 244.
+  **The recovery half of the race test was deliberately not shipped, and the
+  reason is the best outcome available**: it is unreachable, because 005 works.
+  `addSources` is the only path to the race, it is called only from
+  `csv-uploader.tsx`, and every `CsvUploader` mount sits behind a `hydrated`
+  guard (`data-source-card.tsx` and `require-dataset.tsx`) — I verified all
+  three claims on `main`. The guard spec proves it empirically:
+  `input[type="file"]` has count **0** during the delayed read. Reaching the race
+  would mean calling the store from `page.evaluate`, which needs `src/` changes
+  to expose it — out of scope, and rightly. 005 didn't make the race hard to
+  hit; it made it unreachable through any surface a user has.
+  Commits `45b23af..f57caf7` on `advisor/018-e2e-data-loss-paths`.
+
+### 🔴 Finding: `hydrate()`'s guard is not concurrency-safe
+
+Surfaced by writing the E2E suite, which is the argument for having written it —
+no unit test could have reached this.
+
+`if (get().hydrated) return;` (`src/stores/dataset.ts`) is a **check-then-act on
+shared state**. Two concurrent entries both pass it, because neither has resolved
+`loadSources()` yet. The first sets `sources`; the second then observes
+`state.sources.length !== 0`, concludes a *user* raced it, takes 005's `raced`
+branch, and calls `saveSources(get().sources)` — **a wholesale replace that
+deletes exactly the record 004 exists to preserve.**
+
+So 005's data-protecting path becomes data-destroying when `hydrate` races
+itself. Confirmed empirically by the executor with an instrumented
+`indexedDB.open` counter: 9 opens and 2 identical toasts under `next dev`, versus
+4 opens and 1 toast against the production build.
+
+**Today the only trigger is React Strict Mode**, which double-invokes effects in
+`next dev` and is off in production — so this is a development-only symptom right
+now, and the E2E suite correctly runs against the production build rather than
+chasing it. But the guard is structurally unsafe: any second caller of `hydrate`,
+ever, reproduces it in production. Developers also hit it constantly, and it
+defeats 004 precisely in the scenario 004 was written for.
+
+Cheap to fix — latch the in-flight promise rather than a boolean. **Needs its own
+plan; none exists yet.**
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
@@ -136,6 +234,55 @@ that changes real conclusions:
 Honest bound on the risk: nothing user-derived is stored server-side, so this is
 cost and IP-reputation exposure — your Vercel invocations, and Yahoo potentially
 refusing the deployment — not a data breach.
+
+- **015 — COMPLETE, reviewed, APPROVED. Awaiting merge.** The first plan executed
+  against the re-scoped, production-aware version. Every criterion re-run
+  independently: `typecheck` 0, `check` 0 (still exactly 5 warnings), `test` 0
+  (13 files / **244** — 228 plus 16 new), `build` 0. Scope clean: the two route
+  files, `live-prices.ts`, `live-prices.test.ts`. `MAX_SYMBOLS` still 100,
+  `queue: { concurrency: 4 }` untouched, no infrastructure dependency added.
+  Verified by reading the code, not the report:
+  - The origin check is the right way round —
+    `if (secFetchSite && secFetchSite !== "same-origin")`, so an **absent**
+    header is allowed and the documented `curl` examples keep working. The
+    executor confirmed this empirically against a running server: no header →
+    200, `same-origin` → 200, `cross-site` → 403.
+  - `MAX_HISTORY_SYMBOLS = 60`, enforced via an optional `maxSymbols` parameter,
+    and its test asserts `symbols.length < MAX_SYMBOLS` — so it would fail if the
+    history ceiling were ever raised to match the shared one.
+  - The ticker regex exists once, as a named `TICKER_SHAPE`, applied to both
+    `ticker` and `symbol`.
+  - No upstream text reaches a client. The 502 handlers log error class and a
+    symbol count; the per-symbol miss names only the ticker.
+  Commit range `c6ad2d5..764ee67` (6 commits), **merged via PR #20**; CI green in
+  45s.
+  *Residual, accepted*: the two 400 paths still interpolate the app's own
+  validation message, which echoes the rejected value — and a value that failed
+  the shape test is by definition unbounded. It is JSON-encoded, returned only to
+  the sender, and reveals nothing about the server, so it is reflection rather
+  than a vulnerability. Recorded so nobody re-derives it.
+  *Plan gaps the executor found*: the Git workflow section named only three
+  commit messages because Steps 7 and 8 were added after it was last edited — now
+  fixed. And its own first pass at Step 3 wrote the ticker regex a second time,
+  which the `grep -c ... returns 1` criterion caught; it factored out
+  `TICKER_SHAPE` rather than loosening the check.
+  *Not covered*: throttling by request rate. Steps 7 and 8 reduce the exposure —
+  cross-site abuse is blocked and the worst-case amplification drops from ~101 to
+  ~61 upstream requests — but a determined same-origin caller is still
+  unthrottled. A shared-store limiter remains a maintainer decision.
+
+### Follow-up this surfaced: the deployed app tells its users nothing
+
+Plan 014 fixed the **README**, which lives on GitHub. Someone who arrives at
+`https://ws-analytics.vercel.app` and uploads a CSV never sees it. The running
+app does not say that it is a shared deployment, that live pricing is opt-in, or
+that clicking it sends their ticker symbols through someone else's server.
+
+The README now states all three — to an audience that may not be the one using
+the hosted instance. An in-app disclosure is a different change with a different
+surface (a line near the uploader, or beside the live-prices button) and is not
+covered by any current plan. Worth deciding on deliberately rather than by
+default, given the app's whole premise is where the data goes.
 
 ## Dependency notes
 

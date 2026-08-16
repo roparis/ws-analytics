@@ -17,8 +17,9 @@
 - **Effort**: M
 - **Risk**: LOW (adds a test layer; touches no application code)
 - **Depends on**: **004 and 005 must both be present.** This plan tests exactly
-  what they fixed. Branch from `advisor/005-gate-uploader-on-hydration`, which
-  already contains 004.
+  what they fixed. Both merged to `main` via PR #18 — branch from `origin/main`.
+  (An earlier revision said to branch from `advisor/005-gate-uploader-on-hydration`;
+  that branch no longer exists.)
 - **Category**: tests
 - **Planned at**: commit `a4a1c9e`, 2026-08-16
 

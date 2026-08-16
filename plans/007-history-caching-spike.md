@@ -45,6 +45,22 @@ consequences, not an implementation detail. See Q1.
 
 ## Current state
 
+> **Since this plan was written** (`d1d2640`), two changes landed that it must be
+> read against. Line numbers in the excerpts below have shifted; the quoted
+> content is all still present and was re-verified on `main` at `0d09156`.
+>
+> 1. **Plan 015 capped this route** (PR #20). `MAX_HISTORY_SYMBOLS = 60` now
+>    applies to the history route only, so the worst case is **61** upstream
+>    requests per inbound request, not 101. Use 61 in any before/after
+>    arithmetic. `MAX_SYMBOLS` is still 100 for the quote route.
+> 2. **Plan 004 changed `src/lib/storage.ts`** (PR #18), adding `updateSources`.
+>    It does not touch the price-history keys, but it moved the line numbers.
+>
+> Neither changes this spike's premise: the route still sets
+> `cache-control: no-store` unconditionally, and nothing narrows the requested
+> range using what is already stored.
+
+
 ### The route explicitly refuses to cache
 
 Verified excerpt, `src/app/api/prices/history/route.ts:121-124`:
@@ -272,19 +288,34 @@ Read, in this order:
 **Verify**: you can state in one sentence how a month's close travels from Yahoo
 to a cell on the analytics page.
 
-### Step 2: Measure the current behaviour
+### Step 2: Establish the baseline — analytically if you cannot measure it
 
-Start the dev server, load an export, open the analytics page, and fetch prices.
-Record from the network panel or `src/app/api/prices/history/route.ts` logging:
+You most likely have **no browser and no real Wealthsimple export**, so a live
+measurement may be out of reach. That is expected. Do not invent numbers, and do
+not skip the step — derive what you can from the code and say which is which.
 
-- how many upstream requests one fetch produces
-- wall-clock duration
-- the size of the stored `PriceHistory` in IndexedDB
+**Derivable from the code, and required:**
 
-Then fetch a second time without reloading and confirm it costs the same. This
-number is the "before" in Q11.
+- Upstream requests per inbound request, as a function of distinct held symbols.
+  Read the fan-out in `src/app/api/prices/history/route.ts` and the FX condition.
+  State the formula and the worst case at `MAX_HISTORY_SYMBOLS`.
+- How many of those requests are for **closed** months — the ones a cache would
+  never need to repeat — versus the current month, for a representative export
+  length. This is the number that decides whether caching is worth building.
+- The shape and approximate size of a stored `PriceHistory`, from its type and
+  the month/symbol counts it would hold.
 
-**Verify**: you have concrete before-numbers written down, not estimates.
+**Already measured, and quotable**: `docs/yahoo-pricing-poc.md` §6 item 2 records
+"a 44-holding portfolio is 45 requests, which the client queue runs four at a
+time in about ten seconds." Cite it as the maintainer's own figure rather than
+re-deriving a wall-clock estimate.
+
+**If you can run the app** — you would need to generate a synthetic CSV, and
+plan 018 describes how — take the live numbers and mark them as measured.
+
+**Verify**: your document states, for every number, whether it was *measured*,
+*derived from code*, or *quoted from the POC doc*. A baseline whose provenance is
+unclear is worse than none, because the design decision rests on it.
 
 ### Step 3: Answer the questions
 
@@ -339,7 +370,8 @@ Create `plans/007-history-caching-design.md` containing:
 - [ ] `plans/007-history-caching-design.md` exists
 - [ ] All twelve questions answered, each with a `file:line` citation or an
       explicit judgement-call recommendation
-- [ ] The measured baseline from Step 2 is present with real numbers
+- [ ] The Step 2 baseline is present, and every number is labelled with its
+      provenance (measured / derived / quoted)
 - [ ] The narrowing algorithm and merge rules are written precisely enough to
       implement without further design work
 - [ ] `git status --short` shows **only** `plans/007-history-caching-design.md`
@@ -361,9 +393,9 @@ Stop and report back (do not improvise) if:
 - You find that narrowing the range changes what Yahoo returns for months
   already held, in a way that makes the merge unsafe. That is a material finding
   and may kill the client-side approach.
-- You cannot produce the Step 2 baseline (no export available, or the route
-  fails). Report what blocked you — a design without the baseline cannot answer
-  Q11.
+- You cannot produce even the *derived* half of the Step 2 baseline. A live
+  measurement being unavailable is expected and is not a STOP; being unable to
+  reason about the fan-out from the code is, because the design rests on it.
 - You find yourself writing production code on the working branch.
 
 ## Maintenance notes
@@ -377,7 +409,12 @@ Stop and report back (do not improvise) if:
   is not a crash — it is a past year valued against a month that was cached
   under the wrong key. `src/lib/market-month.ts` exists because that already
   happened once. Rank Q3/Q4/Q7 accordingly.
-- **This plan reduces the pressure on the open-proxy item** in
-  `docs/yahoo-pricing-poc.md` §6 item 2 by removing load rather than policing
-  it. Worth noting in the design doc, since it makes the case for doing this
-  before rate limiting.
+- **This plan was written expecting to reduce the pressure on the open-proxy
+  item** in `docs/yahoo-pricing-poc.md` §6 item 2 by removing load rather than
+  policing it. **The spike found that claim needs qualifying.** Yahoo's chart
+  endpoint is one HTTP call per symbol *regardless of the requested range's
+  width*, so narrowing the range shrinks payloads, not request counts — only
+  skipping a symbol entirely removes a request. Caching therefore removes load
+  for someone clicking more than once inside a month (45 requests → 0), and
+  removes almost none for someone who clicks once a month. It is not a
+  substitute for the bounds plan 015 added.

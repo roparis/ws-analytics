@@ -250,8 +250,8 @@ is what makes it the right home for the shared validator.
 - `src/app/api/prices/history/route.ts`
 
 **Also in scope — added after the app was found to be in production:**
-- An `Origin` / `Sec-Fetch-Site` check on both routes (Step 6)
-- A lower symbol ceiling on the **history** route specifically (Step 7)
+- An `Origin` / `Sec-Fetch-Site` check on both routes (Step 7)
+- A lower symbol ceiling on the **history** route specifically (Step 8)
 
 > **Why these moved in.** An earlier revision of this plan excluded both,
 > reasoning that they were near-worthless "for a local-first single-user run"
@@ -265,7 +265,7 @@ is what makes it the right home for the shared validator.
 **Out of scope** (do NOT do these):
 - **A shared-store rate limiter** (Upstash, Redis, Vercel KV). It is the robust
   answer and it introduces an infrastructure dependency this app has never had.
-  That is the maintainer's call, not an executor's. Steps 6 and 7 are the
+  That is the maintainer's call, not an executor's. Steps 7 and 8 are the
   no-new-infrastructure mitigations; if they are judged insufficient, the
   follow-up is its own plan.
 - **Vercel WAF / firewall rules.** Platform configuration, not code, and not in
@@ -285,11 +285,14 @@ is what makes it the right home for the shared validator.
 ## Git workflow
 
 - Branch: `advisor/015-route-input-validation`
-- Three commits, one per concern. Messages in repo style (imperative,
-  sentence-case, no conventional-commit prefix):
+- One commit per concern — six, once Steps 7 and 8 were added. Messages in repo
+  style (imperative, sentence-case, no conventional-commit prefix):
   - `Validate a symbol as tightly as the ticker beside it`
-  - `Say that Yahoo failed without repeating what it said`
   - `Share one validator between the two routes that copy it`
+  - `Say that Yahoo failed without repeating what it said`
+  - `Reject cross-site requests to the price routes`
+  - `Give the history route its own lower symbol ceiling`
+  - plus any follow-up needed to satisfy the done criteria
 - Do NOT push or open a pull request unless the operator instructed it.
 
 ## Steps
@@ -397,7 +400,7 @@ below. This is the first test coverage either route's validation has ever had.
 
 **Verify**: `pnpm test live-prices` → all pass.
 
-### Step 6: Reject cross-site requests
+### Step 7: Reject cross-site requests
 
 The only legitimate caller is this app's own browser code. Verified — the entire
 client side of both routes is `post` in `src/lib/live-prices.ts`:
@@ -439,7 +442,7 @@ right and say in your report which requests you confirmed still pass.
 
 **Verify**: `pnpm typecheck && pnpm build` → exit 0.
 
-### Step 7: Cut the history route's amplification
+### Step 8: Cut the history route's amplification
 
 The history route issues **one upstream Yahoo request per symbol**, plus one for
 FX. At the shared `MAX_SYMBOLS = 100` that is up to 101 upstream requests for a
@@ -461,7 +464,7 @@ Keep `MAX_SYMBOLS` itself unchanged — the quote route and the client-side
 **Verify**: `pnpm test` → exit 0, and the new ceiling is unit-tested alongside
 the shared validator from Step 2.
 
-### Step 8: Full verification
+### Step 9: Full verification
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check && pnpm build` → exit 0.
 
@@ -536,7 +539,7 @@ Stop and report back (do not improvise) if:
   they are not testing the new bound.
 - An origin check would reject the app's own client. Report what header the real
   request actually carries rather than loosening the check until it passes.
-- You conclude the mitigations in Steps 6 and 7 are insufficient and a shared
+- You conclude the mitigations in Steps 7 and 8 are insufficient and a shared
   store (Redis/Upstash/Vercel KV) is required. Say so and stop — adding an
   infrastructure dependency is the maintainer's decision.
 - You find yourself trying to suppress `yahoo-finance2`'s internal
