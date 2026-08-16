@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { create } from "zustand";
 import { type MergedDataset, mergeSources, type SourceFile } from "@/lib/merge";
 import {
@@ -5,6 +6,7 @@ import {
 	loadSources,
 	saveOrder,
 	saveSources,
+	updateSources,
 } from "@/lib/storage";
 import { usePriceStore } from "@/stores/prices";
 
@@ -35,6 +37,19 @@ function persist(promise: Promise<unknown>) {
 	});
 }
 
+// A file whose stored text no longer parses is still in the database, but this
+// session cannot show its rows — so every total on screen is missing it. That
+// has to be said out loud; the alternative is a dashboard that is quietly
+// wrong.
+function reportFailedSources(fileNames: string[]) {
+	toast.error(
+		`Couldn't read ${fileNames.length} saved file${fileNames.length === 1 ? "" : "s"}.`,
+		{
+			description: `${fileNames.join(", ")} — still saved, but not counted in these figures. Re-add the file, or report this.`,
+		},
+	);
+}
+
 export const useDatasetStore = create<DatasetState>((set, get) => ({
 	sources: [],
 	dataset: null,
@@ -42,11 +57,14 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
 	hydrate: async () => {
 		if (get().hydrated) return;
 		try {
-			const { sources, reparsed } = await loadSources();
+			const { sources, reparsed, failed } = await loadSources();
 			set({ ...withSources(sources), hydrated: true });
 			// Rows re-derived under a newer parser are written back so the next
-			// load is a straight read.
-			if (reparsed > 0) persist(saveSources(sources));
+			// load is a straight read. `updateSources`, not `saveSources`: a file
+			// that failed to re-parse is missing from `sources` but must stay in
+			// the database, and a wholesale replace would delete it.
+			if (reparsed > 0) persist(updateSources(sources));
+			if (failed.length > 0) reportFailedSources(failed);
 		} catch (error) {
 			console.warn("Could not read local storage:", error);
 			set({ hydrated: true });
