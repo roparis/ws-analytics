@@ -30,6 +30,7 @@ otherwise.
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | TODO |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
+| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | TODO |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
 
@@ -114,6 +115,11 @@ document, not a feature. They must not modify production code.
   lands, a stored file that fails that re-parse is silently deleted from
   IndexedDB — exactly the bug 004 fixes. Running 008 first would trigger the data
   loss for real users. 008 has a STOP condition that greps for 004's function.
+
+- **018 requires 004 and 005.** It exists to verify exactly what they fixed, so
+  it must branch from `advisor/005-gate-uploader-on-hydration` (which already
+  contains 004). Running it earlier would assert behaviour that does not exist
+  yet.
 
 **Soft ordering**
 
