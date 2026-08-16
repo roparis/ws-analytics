@@ -320,13 +320,20 @@ Note `persist(saveSources(get().sources))` — read the merged list back out of
 the store rather than passing the local `sources` variable, which holds only
 what was on disk.
 
-> **If plan 004 has landed**, that plan changed this line to
-> `persist(updateSources(sources))` and added a `failed` return value. Reconcile
-> rather than reverting: keep `failed` handling, and use `updateSources(...)` for
-> the `reparsed` case. For the `raced` case use **`saveSources(get().sources)`** —
-> the store genuinely owns the complete set after merging, and a wholesale
-> replace is what repairs the cleared database. Preserve 004's comment
-> explaining the difference.
+> **Plan 004 landed before this one**, so the reconciliation below is the shape
+> that was actually built. `hydrate` already destructured `failed` and called
+> `persist(updateSources(sources))`. Both survive; the two writes become an
+> `if (raced) … else if (reparsed > 0) …`:
+>
+> - **`raced`** → `persist(saveSources(get().sources))`. The wholesale replace is
+>   correct here and only here: after merging, the store owns the complete set,
+>   and the database is missing whatever `addSources` cleared. It covers
+>   re-parsed rows too, so it *replaces* rather than accompanies the
+>   `updateSources` call — issuing both would leave two fire-and-forget writes
+>   racing each other.
+> - **`reparsed > 0`** → `persist(updateSources(sources))`, with 004's comment
+>   intact.
+> - `failed` handling is untouched and still runs after both.
 
 **Verify**: `pnpm typecheck` → exit 0.
 

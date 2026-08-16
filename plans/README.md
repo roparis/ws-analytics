@@ -19,7 +19,7 @@ otherwise.
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (awaiting merge) |
-| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | TODO |
+| [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (awaiting merge) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
@@ -80,6 +80,30 @@ document, not a feature. They must not modify production code.
   established structurally. The end-to-end proof — bump `PARSER_VERSION`, break
   one file, confirm it survives and comes back — needs a browser and a real
   export.
+
+- **005 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done criterion
+  re-run independently: `typecheck` 0, `check` 0 (still exactly 5 warnings),
+  `test` 0 (13 files / 228), `build` 0. Scope clean — only
+  `src/components/data-source-card.tsx` and `src/stores/dataset.ts`.
+  Verified by reading the diff: the skeleton guard sits before the
+  `!dataset` branch and covers **both** the compact and full renders; the merged
+  order is `[...restored, ...state.sources]` (stored first, raced last — the
+  order `addSources` would have produced), not the reverse; the race path
+  re-persists `get().sources`, the merged list, not the list read from disk; and
+  plan 004's `failed` handling and `updateSources` call both survived intact.
+  Commit `a4a1c9e` on branch `advisor/005-gate-uploader-on-hydration`,
+  **stacked on `advisor/004-preserve-unparseable-sources`** (`38cfca1` confirmed
+  as an ancestor). **Not merged and not pushed.**
+  *Authoring lesson*: the dispatch carried a done criterion asserting
+  `grep -c "updateSources" src/stores/dataset.ts` returns 2. It returns 4 — one
+  import, one call, and two mentions of the symbol *in prose comments* that the
+  reconciled step itself introduced. The executor followed the specified code
+  and flagged the stale count rather than deleting a comment to satisfy the
+  grep. **A `grep -c` on a bare symbol name counts comments too**; future plans
+  should match a call shape (`persist(updateSources(`) rather than a name.
+  *Not verified*: the race itself. `hydrate` reads IndexedDB, absent from the
+  node test environment, so this is established structurally. Reproducing it
+  needs a browser, a slow read, and a drop inside the window.
 
 ## Dependency notes
 
