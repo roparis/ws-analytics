@@ -16,6 +16,12 @@ export interface SourceFile {
 	/** Kept so a later parser fix can re-derive instead of trusting cached rows. */
 	rawText: string;
 	activities: Activity[];
+	/**
+	 * Data-invariant violations found at parse time, one message each. Empty on
+	 * a healthy export. See `validateDataset` and
+	 * `docs/wealthsimple-csv-format.md` §6.
+	 */
+	problems: string[];
 }
 
 /** The window a source actually ended up owning for one account. */
@@ -43,6 +49,8 @@ export interface SourceSummary {
 	segments: CoverageSegment[];
 	confidence: Confidence;
 	confidenceReason: string;
+	/** Carried through from the source file's `problems`, unchanged. */
+	problems: string[];
 }
 
 export interface MergedDataset extends ActivityDataset {
@@ -237,6 +245,7 @@ function runMerge(sources: SourceFile[], keepSkipped: boolean): MergeResult {
 			segments,
 			confidence,
 			confidenceReason,
+			problems: source.problems,
 		});
 
 		if (keepSkipped) skippedBySource[source.fileName] = dropped;

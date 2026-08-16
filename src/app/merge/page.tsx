@@ -265,7 +265,8 @@ export default function MergePage() {
 						</table>
 					</div>
 					{analysis.summaries.some(
-						(summary) => summary.confidence !== "high",
+						(summary) =>
+							summary.confidence !== "high" || summary.problems.length > 0,
 					) && (
 						<ul className="flex flex-col gap-1 text-xs">
 							{analysis.summaries
@@ -276,6 +277,28 @@ export default function MergePage() {
 										<span className="text-muted-foreground">
 											{summary.fileName} — {summary.confidenceReason}
 										</span>
+									</li>
+								))}
+							{analysis.summaries
+								.filter((summary) => summary.problems.length > 0)
+								.map((summary) => (
+									<li
+										className="flex flex-col gap-1"
+										key={`${summary.fileName}-problems`}
+									>
+										<span className="text-muted-foreground">
+											{summary.fileName} — data-invariant violations:
+										</span>
+										<ul className="flex flex-col gap-1 pl-4">
+											{summary.problems.slice(0, 20).map((problem) => (
+												<li key={`${summary.fileName}-${problem}`}>
+													{problem}
+												</li>
+											))}
+											{summary.problems.length > 20 && (
+												<li>…and {summary.problems.length - 20} more</li>
+											)}
+										</ul>
 									</li>
 								))}
 						</ul>
