@@ -201,6 +201,14 @@ export async function fetchPriceHistory(
 	} satisfies PriceHistoryRequest);
 }
 
+// Tickers go into a query string; Yahoo's own alphabet is letters, digits and
+// `.-=^`, so anything else is a caller doing something else. `symbol` gets the
+// same bound: it is echoed back in every quote, miss and history series, and
+// retained through the whole upstream fan-out, so an unbounded one would be
+// reflected output and retained memory for no benefit — every symbol this app
+// produces (`tickersFor`, in `yahoo-ticker.ts`) is already ticker-shaped.
+const TICKER_SHAPE = /^[A-Za-z0-9.=^-]{1,20}$/;
+
 /**
  * Validates the `symbols` array both routes take.
  *
@@ -234,17 +242,10 @@ export function readRequestSymbols(
 		if (!symbol || !ticker) {
 			throw new Error("Every entry needs a `symbol` and a `ticker`.");
 		}
-		// Tickers go into a query string; Yahoo's own alphabet is letters, digits
-		// and `.-=^`, so anything else is a caller doing something else.
-		if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(ticker)) {
+		if (!TICKER_SHAPE.test(ticker)) {
 			throw new Error(`"${ticker}" isn't a ticker.`);
 		}
-		// `symbol` gets the same bound as `ticker`, even though nothing sends it
-		// upstream: it is echoed back in every quote, miss and history series, and
-		// retained through the whole fan-out. Unbounded, it is reflected output and
-		// retained memory for no benefit — every symbol this app produces
-		// (`tickersFor`, in `yahoo-ticker.ts`) is already ticker-shaped.
-		if (!/^[A-Za-z0-9.=^-]{1,20}$/.test(symbol)) {
+		if (!TICKER_SHAPE.test(symbol)) {
 			throw new Error(`"${symbol}" isn't a symbol.`);
 		}
 		return { symbol, ticker };
