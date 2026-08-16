@@ -25,12 +25,13 @@ otherwise.
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | TODO |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | TODO |
-| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (awaiting merge) |
+| [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
-| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (awaiting merge) |
+| [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
-| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE — partial (awaiting merge) |
+| [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | TODO |
+| [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | TODO |
 | [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | TODO |
 
@@ -177,7 +178,7 @@ document, not a feature. They must not modify production code.
   hit; it made it unreachable through any surface a user has.
   Commits `45b23af..f57caf7` on `advisor/018-e2e-data-loss-paths`.
 
-### 🔴 Finding: `hydrate()`'s guard is not concurrency-safe
+### 🔴 Finding: `hydrate()`'s guard is not concurrency-safe — now [plan 019](019-hydrate-concurrency-latch.md)
 
 Surfaced by writing the E2E suite, which is the argument for having written it —
 no unit test could have reached this.
@@ -201,8 +202,9 @@ chasing it. But the guard is structurally unsafe: any second caller of `hydrate`
 ever, reproduces it in production. Developers also hit it constantly, and it
 defeats 004 precisely in the scenario 004 was written for.
 
-Cheap to fix — latch the in-flight promise rather than a boolean. **Needs its own
-plan; none exists yet.**
+Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
+**[019](019-hydrate-concurrency-latch.md)**, which points at `storage.ts`'s
+`schemaReady` as the in-repo exemplar for exactly this hazard.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
