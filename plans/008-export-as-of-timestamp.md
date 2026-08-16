@@ -7,7 +7,7 @@
 > in `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat d1d2640..HEAD -- src/lib/wealthsimple.ts src/lib/merge.ts src/lib/storage.ts src/components/data-source-card.tsx src/app/merge/page.tsx`
+> `git diff --stat 99fa8b4..HEAD -- src/lib/wealthsimple.ts src/lib/merge.ts src/lib/storage.ts src/components/data-source-card.tsx src/app/merge/page.tsx`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -23,6 +23,14 @@
   re-parse is silently deleted from IndexedDB. Do not run this plan before 004.
 - **Category**: direction
 - **Planned at**: commit `d1d2640`, 2026-08-15
+- **Reconciled at**: commit `99fa8b4`, 2026-08-16 — **every dependency named in
+  this plan has now landed.** Plans 002, 003 and 004 are all on `main`, and
+  together they changed all five in-scope files (+449/−15). Every conditional in
+  the original text ("if 003 has landed", "if 004 landed", "if plan 002 landed")
+  is therefore **resolved to the landed branch** below — you are not deciding
+  which case you are in. Every excerpt is re-verified against `99fa8b4`, and the
+  Step 3 typecheck prediction has been corrected: it was wrong about *which*
+  files fail and *when*. See Step 3.
 
 ## Why this matters
 
@@ -89,7 +97,7 @@ is `effective_at` on modern exports and `transaction_date` on older ones.
 
 ### Where it is dropped today
 
-Verified excerpt, `src/lib/wealthsimple.ts:30-47`:
+Verified excerpt, `src/lib/wealthsimple.ts:31-49`:
 
 ```ts
 /**
@@ -113,7 +121,7 @@ function toTransactionDate(value: string): string {
 }
 ```
 
-Verified excerpt, `src/lib/wealthsimple.ts:300-302` — the filter that removes it:
+Verified excerpt, `src/lib/wealthsimple.ts:300-302` — the filter that removes it (unchanged since this plan was written):
 
 ```ts
 				const activities = results.data
@@ -131,7 +139,7 @@ You are adding a read of the raw rows *before* that filter, not changing it.
 
 ### The version constant to bump
 
-Verified excerpt, `src/lib/wealthsimple.ts:50-57`:
+Verified excerpt, `src/lib/wealthsimple.ts:51-58`:
 
 ```ts
 /**
@@ -146,7 +154,8 @@ export const PARSER_VERSION = 2;
 
 ### The type to extend
 
-Verified excerpt, `src/lib/merge.ts:14-19`:
+Verified excerpt, `src/lib/merge.ts:14-25` — this is the **post-003** shape, and
+003 has landed:
 
 ```ts
 export interface SourceFile {
@@ -154,14 +163,19 @@ export interface SourceFile {
 	/** Kept so a later parser fix can re-derive instead of trusting cached rows. */
 	rawText: string;
 	activities: Activity[];
+	/**
+	 * Data-invariant violations found at parse time, one message each. Empty on
+	 * a healthy export. See `validateDataset` and
+	 * `docs/wealthsimple-csv-format.md` §6.
+	 */
+	problems: string[];
 }
 ```
 
-> **If plan 003 has landed**, this interface also carries `problems: string[]`.
-> Add your field alongside it; do not remove theirs.
+`problems` is 003's and is not yours to change. Add your field alongside it.
 
-Verified excerpt, `src/lib/merge.ts:35-44` — `SourceSummary`, which is what both
-UI surfaces read:
+Verified excerpt, `src/lib/merge.ts:44-54` — `SourceSummary`, which is what both
+UI surfaces read, also post-003:
 
 ```ts
 export interface SourceSummary {
@@ -172,8 +186,13 @@ export interface SourceSummary {
 	segments: CoverageSegment[];
 	confidence: Confidence;
 	confidenceReason: string;
+	/** Carried through from the source file's `problems`, unchanged. */
+	problems: string[];
 }
 ```
+
+It is built at `src/lib/merge.ts:240-249` (`summaries.push({ ... })`) — that is
+where you copy your field through, beside `dateRange` at `:244`.
 
 ### The precedent for a staleness idiom
 
@@ -204,6 +223,15 @@ old".
 | Lint | `pnpm check` | exit 0 (5 pre-existing warnings) |
 | Build | `pnpm build` | exit 0 |
 
+**Before Step 1, record your own baseline.** Run `pnpm typecheck && pnpm test &&
+pnpm check` and write down the passing test count, the file count, and the
+warning count. Every later "all tests pass" in this plan means *your* numbers,
+not any figure quoted in a plan document — several plans have shipped since this
+one was written and the suite has grown. At the time of reconciliation it was
+`Tests 293 passed (293)` across 17 files with 5 warnings, all in
+`src/lib/google-sheet.ts`. Treat that as context, not as an assertion: stop only
+if something **fails**.
+
 ## Scope
 
 **In scope** (the only files you should modify or create):
@@ -213,8 +241,8 @@ old".
 - `src/components/data-source-card.tsx`
 - `src/app/merge/page.tsx`
 - `src/lib/wealthsimple.test.ts` — add tests for the new pure helper
-- `src/lib/merge.test.ts` — **only if plan 002 landed**, to keep fixtures
-  compiling
+- `src/lib/merge.test.ts` — **002 has landed**, so this file exists and builds
+  `SourceFile` fixtures; expect to update them to keep it compiling
 - `docs/wealthsimple-csv-format.md` — move open item 8 to the Fixed list
   (Step 7)
 
@@ -313,15 +341,31 @@ untouched:
 Then include it in the resolved object:
 
 ```ts
-				resolve({ fileName, rawText, activities, exportedOn });
+				resolve({ fileName, rawText, activities, problems, exportedOn });
 ```
 
-> **If plan 003 has landed**, that `resolve` also carries `problems`. Keep both.
+003 has landed, so that `resolve` already carries `problems` — verified at
+`src/lib/wealthsimple.ts:332`. Keep it.
 
-**Verify**: `pnpm typecheck` → **fails**, naming every `SourceFile` construction
-site. That is expected. The list should be `src/lib/merge.ts` (the type),
-`src/lib/storage.ts`, and — if plan 002 landed — `src/lib/merge.test.ts`. **If
-it names any file outside the In-scope list, STOP.**
+**Verify**: `pnpm typecheck` → **fails with exactly one error, in
+`src/lib/wealthsimple.ts`**, at the `resolve(...)` call.
+
+Read that carefully, because the original version of this plan predicted the
+wrong thing here and you should not go looking for failures that will not
+appear yet. `parseActivities` is declared `Promise<SourceFile>`
+(`src/lib/wealthsimple.ts:270-273`), so `resolve` takes a `SourceFile`. Adding
+`exportedOn` to a fresh object literal trips TypeScript's excess-property check
+**at that literal** — something like "Object literal may only specify known
+properties, and 'exportedOn' does not exist in type 'SourceFile'".
+
+`src/lib/storage.ts` and `src/lib/merge.test.ts` still compile at this point:
+they construct `SourceFile` values that are missing a field the interface does
+not yet declare. They fail only after Step 4 adds the field to the interface,
+which is the intended order.
+
+**STOP if** the failure names any file outside the In-scope list, or if
+`pnpm typecheck` **passes** — a pass means your new property is not reaching the
+typed `resolve` and the rest of the plan will not behave as written.
 
 ### Step 4: Thread it through the types
 
@@ -345,10 +389,26 @@ stored source re-parses on the next load and picks the field up from
 `parseActivities` — but the branch must still compile. Set it from the stored
 entry if you add it to `StoredSource`, or `null` otherwise.
 
-**Decide and be consistent**: adding `exportedOn` to `StoredSource` means it
-survives without a re-parse next time the version bumps. That is the better
-long-term shape. Do it, and add the field to the `put` in `saveSources` (and to
-`updateSources`, if plan 004 landed).
+**Decide and be consistent**: adding `exportedOn` to `StoredSource`
+(`src/lib/storage.ts:28`) means it survives without a re-parse next time the
+version bumps. That is the better long-term shape. Do it.
+
+004 has landed, so there are **two** write paths and both need the field — this
+is the single easiest thing to half-do in this plan:
+
+- `saveSources` — the `put` at `src/lib/storage.ts:215-216`
+- `updateSources` — the `put` at `src/lib/storage.ts:246-247`
+
+And one read path: the "already current version" branch at
+`src/lib/storage.ts:180-185`, which builds a `SourceFile` from the stored entry.
+Note how it handles 003's field — `problems: validateDataset(entry.activities)`,
+recomputed rather than stored. Yours is different: `exportedOn` cannot be
+recomputed from `activities`, because the footer row is not in `activities` at
+all. Read it from the stored entry, falling back to `null` for entries written
+before this change.
+
+`loadSources` returns `{ sources, reparsed, failed }` since 004. Do not change
+that shape.
 
 **Verify**: `pnpm typecheck` → exit 0.
 
@@ -370,9 +430,10 @@ export const PARSER_VERSION = 3;
 
 **Verify**: `grep -n "PARSER_VERSION = 3" src/lib/wealthsimple.ts` → one match.
 
-**Verify** that plan 004 has landed, because this bump is what makes it matter:
-`grep -n "updateSources" src/lib/storage.ts` → should find the function. **If it
-does not, STOP** — see the Depends-on note at the top.
+Plan 004 has landed, which is what makes this bump safe: a re-parse that fails
+now preserves the stored source instead of dropping it. Confirm it is really
+there before bumping — `grep -n "export async function updateSources" src/lib/storage.ts`
+→ one match. **If it does not, STOP** — see the Depends-on note at the top.
 
 ### Step 6: Show it
 
@@ -435,8 +496,10 @@ New tests in `src/lib/wealthsimple.test.ts`:
 
 Model structurally after the existing `describe` blocks in that file.
 
-If plan 002 landed, add one case to `src/lib/merge.test.ts`: a source with an
-`exportedOn` value produces a summary carrying the same value unchanged.
+002 has landed, so add one case to `src/lib/merge.test.ts`: a source with an
+`exportedOn` value produces a summary carrying the same value unchanged. You
+will be in that file anyway — its `SourceFile` fixtures stop compiling the
+moment Step 4 adds a required field.
 
 Existing tests that must keep passing: **all of them**, unchanged. This plan
 must not move a single computed figure.
