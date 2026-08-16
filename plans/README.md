@@ -18,7 +18,7 @@ otherwise.
 | [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (awaiting merge) |
 | [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
-| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | TODO |
+| [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (awaiting merge) |
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | TODO |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | TODO |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | TODO |
@@ -60,6 +60,26 @@ document, not a feature. They must not modify production code.
   verification simulates what CI does but cannot confirm
   `pnpm/action-setup@v4` resolving the `packageManager` field, or the
   `cache: pnpm` ordering. The first real CI run on a PR is the end-to-end proof.
+- **004 — COMPLETE, reviewed, APPROVED. Awaiting merge.** Every done criterion
+  re-run independently by the reviewer: `typecheck` 0, `check` 0 (still exactly
+  5 warnings), `test` 0 (13 files / 228), `build` 0. Scope clean — only
+  `src/lib/storage.ts` and `src/stores/dataset.ts`; `PARSER_VERSION` untouched,
+  nothing under `plans/`. Verified by reading the diff, not the report:
+  `updateSources` transacts over `SOURCES` only, has **no** `store.clear()`, and
+  never writes `ORDER_KEY`; `hydrate` no longer calls `saveSources` (the one
+  remaining mention inside it is the explanatory comment), while `addSources`
+  and `removeSource` still do, correctly.
+  Commit `38cfca1` on branch `advisor/004-preserve-unparseable-sources`, cut
+  from `1d09a07`. **Not merged and not pushed.**
+  *Plan defect found by the executor*: Step 1 predicted `pnpm typecheck` would
+  fail until Step 3. It does not — TypeScript permits destructuring a subset of
+  a widened return type. The executor flagged the mismatch rather than forcing
+  the predicted result; Step 1 and its STOP condition have been corrected.
+  *Not verified*: the runtime behaviour. `src/lib/storage.ts` talks to IndexedDB,
+  which does not exist under the suite's node environment, so the fix is
+  established structurally. The end-to-end proof — bump `PARSER_VERSION`, break
+  one file, confirm it survives and comes back — needs a browser and a real
+  export.
 
 ## Dependency notes
 
