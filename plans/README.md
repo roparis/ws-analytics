@@ -16,7 +16,7 @@ otherwise.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | [001](001-ci-workflow.md) | Run the existing checks on every push and PR | P1 | S | — | DONE (merged) |
-| [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | TODO |
+| [002](002-merge-characterization-tests.md) | Cover `merge.ts` with characterization tests | P1 | M | — | DONE (awaiting merge) |
 | [003](003-invariants-in-production.md) | Run the data-invariant checks in every build, show results in the UI | P1 | M | — | TODO |
 | [004](004-preserve-unparseable-sources.md) | Stop deleting a source's raw text when it fails to re-parse | P1 | S | — | DONE (merged) |
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
@@ -231,6 +231,36 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   assertion. The 6 new unit tests exercise the helper in isolation and would have
   passed regardless of whether the store adopted it — which the plan asked it to
   say plainly, and it did.
+
+- **002 — COMPLETE, reviewed, APPROVED. Awaiting merge.** 11 tests, 244 → **255**.
+  `typecheck` 0, `check` 0 (still exactly 5 warnings), `build` 0, `test:e2e` 3/3.
+  Scope: one new file. **`src/lib/merge.ts` untouched** — verified empty diff.
+  No mocks (`grep` → 0), no non-null assertions (0 — the repo has none elsewhere).
+  **No bug was found**, which is worth stating rather than glossing: every
+  characterization test passed on first write, so `merge.ts` does today exactly
+  what the data dictionary says it should. The value here is the safety net, not
+  a discovery.
+  I read the two load-bearing tests rather than trusting the count:
+  - **Duplicate preservation (§7)** asserts `toHaveLength(3)`, not 2, *and* that
+    summed `netCashAmount` matches the input. It fails the moment anything
+    de-duplicates by row content — the one change that would silently delete real
+    money.
+  - **The §6.1 invariant** builds two accounts, one with a redundant overlap plus
+    a genuinely new row and one untouched by the second file, computes expected
+    per-account totals by hand (including a negative row, so sign handling is
+    covered), and compares within half a cent — matching `merge.ts`'s own
+    disagreement threshold.
+  Fixtures are small, round and obviously invented, per §9.
+  Commit `500c930` on `advisor/002-merge-characterization-tests`.
+  *Lint fixup beyond the plan's steps*: the first draft used `merged!.foo`
+  non-null assertions, which Biome rejects and which no other test file in the
+  repo uses. Replaced with two local helpers that narrow via an explicit throw.
+  Mechanical, inside the one in-scope file, and disclosed.
+  *Process note*: this dispatch told the executor to **measure its own baseline**
+  rather than trusting the count written in the plan — the plans still say 227/228,
+  which has been stale for several PRs and which I had handed to two earlier
+  executors. It measured 244 and used that. Worth repeating for every future
+  dispatch.
 
 ## ⚠️ This app is in production — a premise several plans got wrong
 
