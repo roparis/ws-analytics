@@ -29,7 +29,7 @@ otherwise.
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
-| [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | TODO |
+| [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (awaiting merge) |
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (merged) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | DONE (awaiting merge) |

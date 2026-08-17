@@ -22,6 +22,12 @@ export interface SourceFile {
 	 * `docs/wealthsimple-csv-format.md` §6.
 	 */
 	problems: string[];
+	/**
+	 * The date the export itself says it is current as of, from its footer, or
+	 * null when the file carries no footer. Provenance, not data — no figure is
+	 * derived from it.
+	 */
+	exportedOn: string | null;
 }
 
 /** The window a source actually ended up owning for one account. */
@@ -46,6 +52,8 @@ export interface SourceSummary {
 	rowsUsed: number;
 	rowsSkipped: number;
 	dateRange: { start: string; end: string };
+	/** Carried through from the source file's `exportedOn`, unchanged. */
+	exportedOn: string | null;
 	segments: CoverageSegment[];
 	confidence: Confidence;
 	confidenceReason: string;
@@ -242,6 +250,7 @@ function runMerge(sources: SourceFile[], keepSkipped: boolean): MergeResult {
 			rowsUsed: used,
 			rowsSkipped: skipped,
 			dateRange: windowOf(source.activities) ?? { start: "", end: "" },
+			exportedOn: source.exportedOn,
 			segments,
 			confidence,
 			confidenceReason,

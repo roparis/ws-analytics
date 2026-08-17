@@ -49,13 +49,40 @@ function toTransactionDate(value: string): string {
 }
 
 /**
+ * Pins the two parts §1.1 guarantees — the literal `As of` and an ISO date —
+ * and ignores the time and offset that follow, whose formatting is less
+ * certain and which nothing here needs. Requiring the prefix is what keeps a
+ * real row out: neither `2026-01-15` nor `2026-08-06T15:31:21-04:00` matches.
+ */
+const AS_OF_FOOTER = /^\s*As of\s+(\d{4}-\d{2}-\d{2})/i;
+
+/**
+ * The export's own "data is current as of" watermark.
+ *
+ * Wealthsimple closes every file with a blank line and a single-field row
+ * reading `As of <date> <time> <offset>`. A `header: true` parse hands that row
+ * back as an ordinary record whose date column holds the whole string, which is
+ * why the activity filter drops it — see `toTransactionDate`. The date in it is
+ * real information: every figure the app shows is bounded by it.
+ *
+ * Returns the calendar date as `YYYY-MM-DD`, or null when the file has no such
+ * footer — hand-trimmed files and re-parses of stored text both occur. The date
+ * is taken as the matched characters rather than by parsing to a `Date`, for
+ * the same reason `toTransactionDate` documents.
+ */
+export function extractExportedOn(value: string | undefined): string | null {
+	return AS_OF_FOOTER.exec(value ?? "")?.[1] ?? null;
+}
+
+/**
  * Bump whenever parsing changes semantics. Persisted sources carry the version
  * they were parsed with; a mismatch re-parses the stored raw text rather than
  * serving rows produced by known-stale logic.
  *
  * 2: accept `effective_at`, and keep the time of day it carries.
+ * 3: read the export's "As of" footer instead of only discarding it.
  */
-export const PARSER_VERSION = 2;
+export const PARSER_VERSION = 3;
 
 export interface Activity {
 	/** `YYYY-MM-DD`, in the account's own timezone. */
@@ -297,6 +324,13 @@ export function parseActivities(
 					return;
 				}
 
+				// The footer row is dropped from activities below, but it carries
+				// the export's own timestamp — read it before it goes.
+				const exportedOn = results.data.reduce<string | null>(
+					(found, row) => found ?? extractExportedOn(row[dateColumn]),
+					null,
+				);
+
 				const activities = results.data
 					.map((row) => toActivity(row, dateColumn))
 					.filter((activity) => activity.transactionDate !== "");
@@ -329,7 +363,7 @@ export function parseActivities(
 				// read. See docs/wealthsimple-csv-format.md §6.
 				const problems = validateDataset(activities);
 
-				resolve({ fileName, rawText, activities, problems });
+				resolve({ fileName, rawText, activities, problems, exportedOn });
 			},
 			error: (error: Error) => reject(error),
 		});

@@ -52,6 +52,7 @@ function makeSource(fileName: string, activities: Activity[]): SourceFile {
 		rawText: "not read by the merge logic",
 		activities,
 		problems: [],
+		exportedOn: null,
 	};
 }
 
@@ -332,5 +333,21 @@ describe("mergeSources — problems pass through unchanged", () => {
 		// (empty) problems list still carries through untouched.
 		expect(merged.sources[1].rowsSkipped).toBe(1);
 		expect(merged.sources[1].rowsUsed).toBe(1);
+	});
+});
+
+describe("mergeSources — exportedOn passes through unchanged", () => {
+	it("carries each source's export date onto its summary, and null when there was no footer", () => {
+		const dated: SourceFile = {
+			...makeSource("export-1.csv", [moneyRow("2026-01-15", 100)]),
+			exportedOn: "2026-08-03",
+		};
+		const undated = makeSource("export-2.csv", [moneyRow("2026-01-20", 50)]);
+
+		const merged = mustMerge([dated, undated]);
+
+		expect(merged.sources[0].exportedOn).toBe("2026-08-03");
+		// A file with no footer is normal, not an error.
+		expect(merged.sources[1].exportedOn).toBeNull();
 	});
 });
