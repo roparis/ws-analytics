@@ -24,7 +24,7 @@ otherwise.
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | DONE (merged) |
 | [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | DONE (merged) |
-| [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | DONE (awaiting merge) |
+| [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | DONE (merged) |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
@@ -32,8 +32,8 @@ otherwise.
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (awaiting merge) |
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (merged) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
-| [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | DONE (awaiting merge) |
-| [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | DONE (awaiting merge) |
+| [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | DONE (merged) |
+| [017](017-pdf-code-splitting.md) | Load the PDF stack only when someone exports a PDF | P3 | S | — | DONE (merged) |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale — finding fixed independently or
@@ -259,6 +259,33 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   `next start` build, where the chunk is fetched strictly after the click. Worth
   knowing before anyone concludes the split is broken by testing in dev.
   Commit `06ca689` on `advisor/017-pdf-code-splitting`.
+
+- **008 — COMPLETE, awaiting merge.** Executed against the reconciled version,
+  after 002, 003 and 004 had all landed and rewritten every in-scope file. The
+  drift was anticipated, not a STOP: `ISO_DATE`, `toTransactionDate`,
+  `PARSER_VERSION = 2` and the activity filter were all byte-for-byte identical
+  to the plan's excerpts, and `SourceFile`/`SourceSummary` differed only by
+  003's `problems` field. Baseline measured, not taken from the plan: 17 files /
+  **293**. Finished at **305**, then 318 once 012 and 016 merged beneath it.
+  `PARSER_VERSION` → 3; `StoredSource` carries the date so a future bump does
+  not re-derive it.
+  *The corrected typecheck prediction held exactly.* Step 3 produced one
+  `TS2353` at the `resolve(...)` call in `src/lib/wealthsimple.ts` and nowhere
+  else — `storage.ts` and `merge.test.ts` stayed silent until Step 4 widened the
+  interface. The plan's original claim, that the failure would name every
+  `SourceFile` construction site, was wrong and had been fixed before dispatch.
+  *The test that matters is the round trip.* Reading the footer means a second
+  reader now touches the raw row the activity filter exists to remove, and §1.1
+  calls that filter "the only thing standing between the footer and a `NaN` in
+  every total". The executor first deleted this test as out of scope (a *new*
+  file was; `wealthsimple.test.ts` was not), then on request folded it in — and
+  **mutation-tested it**: weakening the filter to let the footer through fails
+  those two tests and **no others** in the suite. Nothing previously guarded
+  that seam.
+  *Beyond the literal instruction, correctly*: §1.1 of the data dictionary still
+  read "is currently discarded", which shipping this would have made false in
+  the declared source of truth. It was rewritten to describe what the code does.
+  Commit `ca5b253` on `advisor/008-export-as-of-timestamp`.
 
 
 
