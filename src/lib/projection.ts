@@ -336,8 +336,18 @@ function sumOf(balances: Record<string, number>): number {
  * The first year the projection's total balance reaches zero, or null if it
  * never does. Only meaningful with a withdrawal rate set — without one the
  * balance can only fall if the return is negative.
+ *
+ * A projection that starts at nothing is not a depletion, so it reports null
+ * rather than a year. `startingBalances` returns `{}` for an export holding
+ * only cash-style accounts, which makes every year's total zero — including
+ * year zero, whose total is just the sum of the starting balances. Skipping
+ * year zero alone would not do: it would report year one instead. Depletion
+ * means falling to zero from something, so there has to be something first.
  */
 export function depletionYear(points: ProjectionPoint[]): number | null {
+	const start = points[0];
+	if (!start || start.total <= 0) return null;
+
 	const hit = points.find((point) => point.total <= 0);
 	return hit ? hit.year : null;
 }
