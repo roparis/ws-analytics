@@ -125,19 +125,35 @@ export function parsePriceCsv(
 }
 
 /**
- * `$1,234.56` and `1 234,56` alike. Sheets writes plain numbers for
+ * `$1,234.56` and `1.234,56` alike. Sheets writes plain numbers for
  * `GOOGLEFINANCE` output, but a locale-formatted export shouldn't be rejected
  * over a thousands separator.
+ *
+ * Neither separator can be identified by itself — the dot groups in `1.234,56`
+ * and decides in `1,234.56` — so one question settles both: how many digits
+ * follow the last comma. A decimal comma in a price is followed by one or two,
+ * so a trailing group of three is grouping. That is what tells `1.234,56`
+ * (a thousand-odd) from `1,234.56` (the same), and `12,5` from `95,000`.
+ *
+ * Guessing either way round is worth three orders of magnitude, silently:
+ * `95,000` read as a decimal comma is 95, and `1.234,56` read as a decimal
+ * point is 1.23456. Market value, unrealised gain, the valued balances and the
+ * projection's starting balance all follow the wrong one down.
+ *
+ * What stays unreadable — `1,234,56`, two commas with no consistent reading —
+ * comes back `null`, and the symbol lands in `unpriced` where the UI names it.
  */
 function toNumber(value: string | undefined): number | null {
 	if (!value) return null;
 	const cleaned = value.replace(/[^\d.,-]/g, "").replace(/\s/g, "");
 	if (!cleaned) return null;
 
-	// A comma is a decimal separator only when no dot is present.
-	const normalized = cleaned.includes(".")
-		? cleaned.replace(/,/g, "")
-		: cleaned.replace(/,/g, ".");
+	// One or two digits after the last comma: that comma is the decimal point
+	// and every dot is grouping. Otherwise every comma is grouping, which leaves
+	// any dot present doing the job it was already doing.
+	const normalized = /,\d{1,2}$/.test(cleaned)
+		? cleaned.replace(/\./g, "").replace(/,/g, ".")
+		: cleaned.replace(/,/g, "");
 
 	const parsed = Number(normalized);
 	return Number.isFinite(parsed) ? parsed : null;

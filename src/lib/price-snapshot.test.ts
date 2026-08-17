@@ -76,8 +76,13 @@ const REPORT = buildPositions(ACTIVITIES);
  * Built from `buildWorkbook` rather than hand-written so the parser is tested
  * against the exporter's real headers and preamble. A column rename on one side
  * fails here rather than in someone's browser.
+ *
+ * A price may be given as a string to stand in for a cell the spreadsheet
+ * formatted — `"95,000"`, `"1 234,56"`. Those are written through the same
+ * quoting as every other cell, so an embedded comma stays inside its column
+ * instead of splitting the row.
  */
-function holdingsCsv(prices: Record<string, number | "">): string {
+function holdingsCsv(prices: Record<string, number | string>): string {
 	const sheets = buildWorkbook(REPORT, {
 		activities: ACTIVITIES,
 		dataThrough: "2026-08-01",
@@ -168,6 +173,53 @@ describe("parsePriceCsv", () => {
 			1211.5,
 			6,
 		);
+	});
+
+	it("reads a thousands-grouped integer at full scale", () => {
+		// A price cell formatted to zero decimal places — a plausible default for
+		// a high-priced instrument — downloads as `95,000`. Reading that comma as
+		// a decimal point gives 95: a price wrong by three orders of magnitude,
+		// and every market value, unrealised gain and projection follows it down.
+		const csv = holdingsCsv({ ZAG: "95,000", VTI: 140, XEQT: 34.25 });
+		expect(parsePriceCsv(csv, "Holdings.csv").pricesCad.ZAG).toBeCloseTo(
+			95_000,
+			6,
+		);
+	});
+
+	// Both directions of the comma rule. A decimal comma has to keep working —
+	// it is why the rule accepting one exists — and a group separator must not
+	// be eaten. What tells them apart is the digits after the comma, and that
+	// question has to be asked before anything is assumed about the dots: in
+	// `1.234,56` the dot groups, in `1,234.56` it decides.
+	const formats: [label: string, cell: string, expected: number][] = [
+		["an Anglo group separator beside a decimal point", "1,234.56", 1234.56],
+		["a European decimal comma", "1234,56", 1234.56],
+		["a European decimal comma after a space group", "1 234,56", 1234.56],
+		["a European decimal comma after a dot group", "1.234,56", 1234.56],
+		["a European price grouped more than once", "1.234.567,89", 1_234_567.89],
+		["an integer grouped more than once", "1,234,567", 1_234_567],
+		["a plain decimal, the usual GOOGLEFINANCE output", "42.7592", 42.7592],
+	];
+
+	for (const [label, cell, expected] of formats) {
+		it(`reads ${label}`, () => {
+			const csv = holdingsCsv({ ZAG: cell, VTI: 140, XEQT: 34.25 });
+			expect(parsePriceCsv(csv, "Holdings.csv").pricesCad.ZAG).toBeCloseTo(
+				expected,
+				6,
+			);
+		});
+	}
+
+	it("treats a zero price as unknown rather than as a wiped-out holding", () => {
+		const snapshot = parsePriceCsv(
+			holdingsCsv({ ZAG: 11.5, VTI: 0, XEQT: 34.25 }),
+			"Holdings.csv",
+		);
+
+		expect(snapshot.pricesCad).not.toHaveProperty("VTI");
+		expect(snapshot.unpriced).toEqual(["VTI"]);
 	});
 
 	it("rejects a file that isn't the Holdings tab", () => {
