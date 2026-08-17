@@ -611,7 +611,6 @@ function buildSummarySheet(
 
 	const marketValueTotal = holdingsCell(HC.marketValue, holdings.totalRow);
 	const bookCostTotal = holdingsCell(HC.bookCost, holdings.totalRow);
-	const unrealisedTotal = holdingsCell(HC.unrealised, holdings.totalRow);
 	const cashTotal = `${quoted(SHEET_NAMES.cash)}!$C$${cash.totalRow}`;
 
 	sheet.push([text(`Portfolio summary — ${options.fileName}`)]);
@@ -704,7 +703,7 @@ function buildSummarySheet(
 				: formula(`=${quoted(SHEET_NAMES.closed)}!$G$${closed.totalRow}`),
 		),
 	]);
-	const dividendsRow = sheet.push([
+	sheet.push([
 		text("Dividends received"),
 		income.dividendsTotalRow === null
 			? num(0, 2)
@@ -712,19 +711,19 @@ function buildSummarySheet(
 					`=${quoted(SHEET_NAMES.income)}!$E$${income.dividendsTotalRow}`,
 				),
 	]);
-	const interestRow = sheet.push([
+	sheet.push([
 		text("Interest earned"),
 		formula(
 			`=SUM(${quoted(SHEET_NAMES.income)}!$E$${income.costsFirstRow}:$E$${income.costsLastRow})`,
 		),
 	]);
-	const taxRow = sheet.push([
+	sheet.push([
 		text("Withholding tax"),
 		formula(
 			`=-SUM(${quoted(SHEET_NAMES.income)}!$C$${income.costsFirstRow}:$C$${income.costsLastRow})`,
 		),
 	]);
-	const feesRow = sheet.push([
+	sheet.push([
 		text("Fees, net of refunds"),
 		formula(
 			`=-SUM(${quoted(SHEET_NAMES.income)}!$D$${income.costsFirstRow}:$D$${income.costsLastRow})`,
