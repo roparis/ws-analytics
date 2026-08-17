@@ -22,14 +22,14 @@ otherwise.
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | DONE (merged) |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | DONE (merged) |
-| [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | DONE (awaiting review) |
+| [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | DONE (merged) |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | DONE (merged) |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | DONE (merged) |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
-| [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (awaiting merge) |
+| [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (merged) |
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (merged) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | DONE (merged) |
@@ -260,7 +260,7 @@ Cheap to fix — latch the in-flight promise rather than a boolean. Planned as
   knowing before anyone concludes the split is broken by testing in dev.
   Commit `06ca689` on `advisor/017-pdf-code-splitting`.
 
-- **008 — COMPLETE, awaiting merge.** Executed against the reconciled version,
+- **008 — COMPLETE, merged.** Executed against the reconciled version,
   after 002, 003 and 004 had all landed and rewritten every in-scope file. The
   drift was anticipated, not a STOP: `ISO_DATE`, `toTransactionDate`,
   `PARSER_VERSION = 2` and the activity filter were all byte-for-byte identical
@@ -356,7 +356,7 @@ refusing the deployment — not a data breach.
   ~61 upstream requests — but a determined same-origin caller is still
   unthrottled. A shared-store limiter remains a maintainer decision.
 
-- **010 — COMPLETE, awaiting review.** Executed against the reconciled version,
+- **010 — COMPLETE, merged.** Executed against the reconciled version,
   after 015 had landed and rewritten the route. Baseline measured rather than
   taken from the plan: `typecheck` 0, `test` 0 (17 files / **293**), `check` 0
   (5 warnings, all `src/lib/google-sheet.ts`), `build` 0 — all four re-run
