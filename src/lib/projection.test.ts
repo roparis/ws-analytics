@@ -304,6 +304,50 @@ describe("depletionYear", () => {
 
 		expect(depletionYear(points)).toBeNull();
 	});
+
+	// `startingBalances` skips cash-style account types, so an export holding
+	// only chequing/save accounts projects from `{}` — a year-0 total of zero
+	// that was never a depletion, just an empty projection.
+	it("is null for an empty set of starting balances", () => {
+		const points = projectSeries({}, makeInputs({ years: 5 }), AT);
+
+		expect(points[0].total).toBe(0);
+		expect(depletionYear(points)).toBeNull();
+	});
+
+	it("is null when every starting balance is zero", () => {
+		const points = projectSeries(
+			{ TFSA: 0, RRSP: 0 },
+			makeInputs({ years: 5 }),
+			AT,
+		);
+
+		expect(depletionYear(points)).toBeNull();
+	});
+
+	// Year one is the boundary the year-0 guard is most likely to swallow, so a
+	// real depletion there has to survive it. The withdrawal is a share of the
+	// running balance, so only a rate of 1 ever reaches exactly zero.
+	it("still names year one when the balance genuinely runs out there", () => {
+		const points = projectSeries(
+			{ TFSA: 1000, RRSP: 500 },
+			makeInputs({ years: 5, annualReturn: 0.05, withdrawalRate: 1 }),
+			AT,
+		);
+
+		expect(points[0].total).toBeGreaterThan(0);
+		expect(depletionYear(points)).toBe(1);
+	});
+
+	it("is null for a balance left to grow untouched", () => {
+		const points = projectSeries(
+			{ TFSA: 1000 },
+			makeInputs({ years: 5, annualReturn: 0.05 }),
+			AT,
+		);
+
+		expect(depletionYear(points)).toBeNull();
+	});
 });
 
 describe("projectSeries with per-account plans", () => {
