@@ -22,7 +22,7 @@ otherwise.
 | [005](005-gate-uploader-on-hydration.md) | Close the mid-hydration window that deletes saved files | P1 | S | — | DONE (merged) |
 | [009](009-local-calendar-dates.md) | Derive calendar dates from the local clock, not UTC | P1 | M | soft: 001 | DONE (merged) |
 | [013](013-agents-domain-knowledge.md) | Give `AGENTS.md` the domain knowledge that makes this repo hard | P1 | S | — | DONE (merged) |
-| [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | TODO |
+| [010](010-price-history-partial-failure.md) | Stop discarding good price history on a partial failure | P2 | S | — | DONE (awaiting review) |
 | [011](011-closing-writeoff-date.md) | Date a pool's closing write-off to the event that closed it | P2 | S | — | DONE (merged) |
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | DONE (awaiting merge) |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
@@ -328,6 +328,65 @@ refusing the deployment — not a data breach.
   cross-site abuse is blocked and the worst-case amplification drops from ~101 to
   ~61 upstream requests — but a determined same-origin caller is still
   unthrottled. A shared-store limiter remains a maintainer decision.
+
+- **010 — COMPLETE, awaiting review.** Executed against the reconciled version,
+  after 015 had landed and rewritten the route. Baseline measured rather than
+  taken from the plan: `typecheck` 0, `test` 0 (17 files / **293**), `check` 0
+  (5 warnings, all `src/lib/google-sheet.ts`), `build` 0 — all four re-run
+  unchanged afterwards. Those are the numbers **as measured at the time**: 012
+  and 016 merged while this was in review, so on `main` the same commands now
+  report 306 tests and **0** warnings, 016 having cleared the five. Scope clean: only
+  `src/app/api/prices/history/route.ts` and
+  `src/components/investment/live-prices-button.tsx`. `queue: { concurrency: 4 }`
+  untouched; neither `MAX_SYMBOLS` nor `MAX_HISTORY_SYMBOLS` edited, and
+  `src/lib/live-prices.ts`, `price-history.ts`, `positions.ts` and the quote
+  route show no diff since `99fa8b4`. Two commits, one per defect.
+  - Step 2: the fatal `return fail(...)` is gone and a US-quoted symbol with no
+    FX series is now a per-symbol miss, alongside the unconvertible-currency
+    branch it mirrors. A CAD-only portfolio never reaches it — `needsFx` is
+    false, so no FX request is made and every series still ships.
+  - Step 3: the history request is built from **`report.bySymbol`**, not
+    `report.open`. Chosen over `report.positions` (equally complete but one row
+    per *account × symbol*, which makes "keep the open ones" ambiguous for a
+    symbol open in one account and closed in another) and over
+    `report.open ∪ report.closed`, which is **not** complete: `closed` requires
+    `shares === 0 && tradeCount > 0` and `open` requires
+    `shares > SHARE_EPSILON`, so a dust pool with trades falls in neither, and
+    `incomeOnly` is a fourth bucket. `bySymbol` is `rollUpSymbols(positions)`
+    over the full array, so it has no such gap.
+  - Overflow is deterministic and reported: open holdings first (in `bySymbol`'s
+    existing book-cost-descending order), then exits by `lastTradeDate`
+    descending, sliced at `MAX_HISTORY_SYMBOLS`; dropped symbols are named in the
+    existing success toast next to the unpriced ones. Worst case upstream is
+    unchanged at `MAX_HISTORY_SYMBOLS + 1 = 61`.
+  *Plan defect found by the executor*: the plan states the client "guards against
+  [both caps] before sending". It does not. `guard()`
+  (`src/lib/live-prices.ts:260-269`) checks only `MAX_SYMBOLS`, on both paths, so
+  before this change a >60-symbol history request passed the client and was
+  rejected by the route with a 400. The Step 3 truncation is therefore load-
+  bearing, not merely tidy. Left as-is: `live-prices.ts` is out of scope, and
+  capping at the call site achieves the same thing.
+  **For whoever revisits `plans/007`**: nothing in `src/lib/` keeps a history
+  request under `MAX_HISTORY_SYMBOLS`. The only thing that does is the slice in
+  `historyTickersFor`, in `live-prices-button.tsx`. A second caller of
+  `fetchPriceHistory` — a cache warmer, a background refresh — would pass
+  `guard()` with up to 100 symbols and be rejected by the route, and the shared
+  guard would not catch it. Either such a caller applies the same cap, or
+  `guard()` grows a history-aware ceiling.
+  *Also changed, deliberately*: the tooltip said "Only those symbols leave this
+  device" about the open set. Widening the history request made that sentence
+  false, and it is a privacy claim, so it now names both counts. On review a
+  second sentence in it had the same fault — "every symbol you've ever held" is
+  untrue precisely when the cap binds — so the phrase is conditional on
+  `dropped.length` and says "the most recently held of the N you've ever held"
+  when it does. The toast discloses the drop *after* the fetch; the tooltip is
+  what a reader has *before* deciding, and both have to be true.
+  *Not performed*: the manual verification. It needs a real export with a
+  fully-exited holding and a US-listed one, which the executor does not have. It
+  would prove the thing the structural checks cannot — that a year in which an
+  exited holding was held is now priced rather than carried at book cost.
+  Simulating the Step 2 FX failure likewise needs network interference; no
+  temporary edit was made, so nothing needed reverting.
 
 ### Follow-up this surfaced: the deployed app tells its users nothing
 
