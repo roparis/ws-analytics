@@ -82,13 +82,6 @@ export async function POST(request: Request): Promise<Response> {
 			? await monthlyCloses(USD_CAD_TICKER, input.from, input.to)
 			: null;
 
-		if (needsFx && usdCadByMonth?.kind !== "ok") {
-			return fail(
-				"Yahoo returned no USD→CAD history, so US-listed holdings can't be valued in CAD.",
-				502,
-			);
-		}
-
 		for (const { entry, result } of fetched) {
 			if (result.kind === "miss") {
 				misses.push({ ...entry, reason: result.reason });
@@ -99,6 +92,20 @@ export async function POST(request: Request): Promise<Response> {
 				misses.push({
 					...entry,
 					reason: `${entry.ticker} is quoted in ${result.currency || "an unknown currency"}, which this route can't convert to CAD.`,
+				});
+				continue;
+			}
+
+			// One auxiliary ticker failing is no reason to throw away forty chart
+			// requests that worked — a portfolio that is almost entirely TSX-listed
+			// needed that rate for nothing. So a US-quoted symbol with no FX series
+			// is a miss here for exactly the reason an unconvertible currency is a
+			// miss one branch up: this route can't state it in CAD, and the rest of
+			// the response is still true.
+			if (result.currency === "USD" && usdCadByMonth?.kind !== "ok") {
+				misses.push({
+					...entry,
+					reason: `${entry.ticker} is quoted in USD, and no USD→CAD history came back to convert it with.`,
 				});
 				continue;
 			}
