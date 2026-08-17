@@ -159,12 +159,13 @@ export default function MergePage() {
 						make it authoritative for the periods it shares with others.
 					</p>
 					<div className="overflow-x-auto">
-						<table className="w-full min-w-[52rem] text-sm">
+						<table className="w-full min-w-[58rem] text-sm">
 							<thead>
 								<tr className="border-b text-left text-muted-foreground text-xs">
 									<th className="py-2 pr-3 font-normal">#</th>
 									<th className="py-2 pr-3 font-normal">File</th>
 									<th className="py-2 pr-3 font-normal">Covers</th>
+									<th className="py-2 pr-3 font-normal">Exported</th>
 									<th className="py-2 pr-3 text-right font-normal">Used</th>
 									<th className="py-2 pr-3 text-right font-normal">Skipped</th>
 									<th className="py-2 pr-3 font-normal">Confidence</th>
@@ -196,6 +197,13 @@ export default function MergePage() {
 										<td className="whitespace-nowrap py-2 pr-3 text-muted-foreground text-xs">
 											{formatDate(summary.dateRange.start)} –{" "}
 											{formatDate(summary.dateRange.end)}
+										</td>
+										{/* The date the file says it was produced. A file with no
+											footer is normal, so an em dash rather than a warning. */}
+										<td className="whitespace-nowrap py-2 pr-3 text-muted-foreground text-xs">
+											{summary.exportedOn
+												? formatDate(summary.exportedOn)
+												: "—"}
 										</td>
 										<td className="py-2 pr-3 text-right tabular-nums">
 											{summary.rowsUsed.toLocaleString()}

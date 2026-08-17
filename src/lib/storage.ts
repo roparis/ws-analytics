@@ -30,6 +30,13 @@ interface StoredSource {
 	rawText: string;
 	activities: Activity[];
 	parserVersion: number;
+	/**
+	 * Stored rather than recomputed, so it survives a parser-version bump the
+	 * way the rows themselves do. Absent on entries written before this field
+	 * existed; those re-parse anyway, since the bump that added it is what makes
+	 * them stale.
+	 */
+	exportedOn?: string | null;
 }
 
 const STORES = [
@@ -183,6 +190,7 @@ export async function loadSources(): Promise<{
 					// already in memory, and a stored copy could outlive a change to
 					// the checks themselves.
 					problems: validateDataset(entry.activities),
+					exportedOn: entry.exportedOn ?? null,
 				});
 				continue;
 			}
@@ -215,6 +223,7 @@ export async function saveSources(sources: SourceFile[]): Promise<void> {
 				rawText: source.rawText,
 				activities: source.activities,
 				parserVersion: PARSER_VERSION,
+				exportedOn: source.exportedOn,
 			} satisfies StoredSource);
 		}
 		tx.objectStore(META).put({
@@ -246,6 +255,7 @@ export async function updateSources(sources: SourceFile[]): Promise<void> {
 				rawText: source.rawText,
 				activities: source.activities,
 				parserVersion: PARSER_VERSION,
+				exportedOn: source.exportedOn,
 			} satisfies StoredSource);
 		}
 		await done(tx);

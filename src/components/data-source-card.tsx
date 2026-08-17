@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CsvUploader } from "@/components/csv-uploader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/lib/metrics";
 import { useDatasetStore } from "@/stores/dataset";
 
 interface DataSourceCardProps {
@@ -50,6 +51,18 @@ export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 	const flagged = dataset.sources.reduce(
 		(total, source) => total + source.problems.length,
 		0,
+	);
+	// The merged dataset is as current as its most recent export. Compared as
+	// strings: `YYYY-MM-DD` already sorts chronologically, and parsing to a
+	// `Date` is the thing this codebase avoids everywhere else. Null when no
+	// loaded file carried a footer, which is normal — the line is simply
+	// omitted rather than claiming a date the files never stated.
+	const exportedOn = dataset.sources.reduce<string | null>(
+		(newest, source) =>
+			source.exportedOn && (!newest || source.exportedOn > newest)
+				? source.exportedOn
+				: newest,
+		null,
 	);
 
 	const clearButton = (
@@ -99,6 +112,7 @@ export function DataSourceCard({ compact = false }: DataSourceCardProps) {
 				<span className="text-xs">
 					{dataset.activities.length.toLocaleString()} activities ·{" "}
 					{dataset.accounts.length} accounts
+					{exportedOn && ` · exported ${formatDate(exportedOn)}`}
 				</span>
 				{conflicts > 0 ? (
 					<span className="flex items-start gap-1 pt-0.5 text-destructive text-xs">

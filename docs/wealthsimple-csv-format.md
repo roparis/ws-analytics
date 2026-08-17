@@ -39,8 +39,10 @@ The last two lines of the file are a blank line and an export-timestamp row. A n
 `transaction_date` to match `^\d{4}-\d{2}-\d{2}`. Keep that filter — it is the only thing
 standing between the footer and a `NaN` in every total.
 
-The timestamp is genuinely useful metadata (it is the "data is current as of" watermark) but
-is currently discarded. Capturing it would let the UI say how stale a source is.
+The timestamp is genuinely useful metadata (it is the "data is current as of" watermark).
+`extractExportedOn` reads it off the same raw rows *before* that filter runs and carries it on
+the source as `exportedOn`, so the UI can say how fresh a file is. It is provenance, never an
+input: no KPI, position, projection or valuation reads it.
 
 ### 1.3 The date column was renamed, and gained a time
 
@@ -490,10 +492,16 @@ Fixed alongside these, found while verifying:
    as does `flowBreakdown`'s EFT pair. Totals are unchanged on the reference export because
    sign and description agree on every row. (§3.1)
 
+Fixed since:
+
+8. ~~**The export timestamp is discarded.**~~ `extractExportedOn` reads the footer's "As of"
+   date and carries it on each source as `exportedOn`; the sidebar shows the newest across the
+   loaded files and the merge review shows it per file. The footer is still dropped from
+   activities by the same leading-date test — it is read before that filter, not through it.
+   The date is provenance only: no figure derives from it. (§1.1)
+
 ### Open
 
-8. **The export timestamp is discarded.** The footer's "As of" time would let the UI show
-   source freshness. (§1.1)
 9. **`name` is used unnormalised.** Non-breaking spaces and trailing whitespace will bite any
    grouping or matching on that field. Currently latent — nothing groups by `name` today. (§2.5)
 10. **Portfolio value is not derivable from this file.** If the UI implies a portfolio value or
