@@ -8,10 +8,15 @@
 > report.
 >
 > **Drift check (run first)**:
-> `git diff --stat d1d2640..HEAD -- src/lib/yahoo-ticker.ts src/lib/price-snapshot.ts src/lib/google-sheet.ts src/stores/prices.ts`
-> If any file changed since this plan was written, compare the "Current state"
-> excerpts against the live code before proceeding; on a mismatch, treat it as a
-> STOP condition.
+> `git diff --stat 8f123b3..HEAD -- src/lib/yahoo-ticker.ts src/lib/price-snapshot.ts src/lib/google-sheet.ts src/stores/prices.ts`
+>
+> **This is a spike, so drift is not a STOP condition here** — unlike in the
+> build plans, where a stale excerpt means you are about to edit code you have
+> not read. Nothing ships from this document, and your job is to describe the
+> code *as it is now*. If an excerpt below disagrees with the live file, the
+> live file wins: note the difference in your deliverable and carry on. Stop
+> only if the disagreement invalidates the spike's premise, which is stated in
+> the STOP conditions.
 
 ## Status
 
@@ -21,6 +26,13 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `d1d2640`, 2026-08-15
+- **Reconciled at**: commit `8f123b3`, 2026-08-16 — `google-sheet.ts` and
+  `yahoo-ticker.ts` are **unchanged**, so the spike's central finding stands
+  exactly as written: the app writes an editable ticker column, tells the user
+  to edit it, and never reads it back. `price-snapshot.ts` and `stores/prices.ts`
+  have both changed (plans 009 and 012, and the live-pricing work), but only in
+  ways that shift line numbers here — every excerpt below is re-verified. The
+  drift check has been softened to suit a spike; see above.
 
 ## Why this matters
 
@@ -46,7 +58,7 @@ instructs an edit and then throws it away.
 
 ### The app asks the user to fix a ticker
 
-Verified excerpt, `src/lib/google-sheet.ts:456-460` — text written into the
+Verified excerpt, `src/lib/google-sheet.ts:455-460` — text written into the
 Holdings tab:
 
 ```ts
@@ -89,17 +101,20 @@ But `grep -n "COLUMNS\." src/lib/price-snapshot.ts` returns exactly three lines,
 and `COLUMNS.ticker` is not among them:
 
 ```
-75:		(line) => line.includes(COLUMNS.symbol) && line.includes(COLUMNS.priceCad),
-93:		const symbol = (row[COLUMNS.symbol] ?? "").trim();
-97:		const price = toNumber(row[COLUMNS.priceCad]);
+76:		(line) => line.includes(COLUMNS.symbol) && line.includes(COLUMNS.priceCad),
+94:		const symbol = (row[COLUMNS.symbol] ?? "").trim();
+98:		const price = toNumber(row[COLUMNS.priceCad]);
 ```
+
+Re-run that `grep` yourself rather than trusting the line numbers — they have
+moved once already and the count is the part that matters.
 
 `COLUMNS.ticker` and `COLUMNS.account` are declared and never read. The seam is
 literally already named in the code.
 
 ### The Yahoo path has no override at all
 
-Verified excerpt, `src/lib/yahoo-ticker.ts:52-73`:
+Verified excerpt, `src/lib/yahoo-ticker.ts:59-73`:
 
 ```ts
 export function tickersFor(

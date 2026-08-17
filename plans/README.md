@@ -386,25 +386,34 @@ default, given the app's whole premise is where the data goes.
 
 ## Baseline
 
-Re-measured at commit `1d09a07` in a **clean worktree** (no `node_modules`, no
-`.next/`), which is what an executor and what CI actually see. If any of these
-differs when you start, treat it as drift and check your plan's "Current state"
-excerpts before proceeding.
+Re-measured at commit `8f123b3` in a **clean worktree** (no `node_modules`, no
+`.next/`), which is what an executor and what CI actually see.
 
 | Command | Result on a clean checkout |
 |---|---|
 | `pnpm install --frozen-lockfile` | exit 0 |
 | `pnpm check` | exit 0 — 5 warnings, all `noUnusedVariables` in `src/lib/google-sheet.ts` (lines 614, 707, 715, 721, 727) |
-| `pnpm typecheck` | **exit 2 — fails until plan 001 lands. See below.** |
-| `pnpm test` | exit 0 — 13 files, **228** tests |
+| `pnpm typecheck` | exit 0 — **since plan 001 landed. See below.** |
+| `pnpm test` | exit 0 — 17 files, **293** tests |
 | `pnpm build` | exit 0 |
 
 `pnpm check` exiting 0 while printing warnings is expected. Only plan 016 takes
 that count to zero, and no plan promotes warnings to errors.
 
-### ⚠️ `pnpm typecheck` fails on a clean checkout until plan 001 lands
+**Do not hand these numbers to an executor as a STOP condition.** That mistake
+was made in plans 008, 010, 012 and 016, all of which asserted
+`Tests 228 passed (228)` and would have halted an executor on a perfectly
+healthy tree once the suite grew. Every plan now instructs its executor to
+**measure its own baseline** and to stop only on a genuine *failure*, never on a
+count that differs. The figures above are context for the reader, not an
+assertion for a script — they go stale by design, every time a plan lands.
 
-**This affects every plan in this directory**, because they all carry a
+### ✅ `pnpm typecheck` on a clean checkout — fixed by plan 001
+
+Kept because it explains a trap that cost a dispatch, and because the same shape
+of failure can return: the gate depends on generated files that are not in git.
+
+**This used to affect every plan in this directory**, because they all carry a
 `pnpm typecheck` done criterion and executors work in fresh worktrees.
 
 `tsconfig.json` includes `next-env.d.ts` and `.next/types/**/*.ts`. Both are
@@ -417,13 +426,15 @@ src/app/accounts/[type]/[accountId]/page.tsx(8,9): error TS2304: Cannot find nam
 src/app/layout.tsx(25,50): error TS2304: Cannot find name 'LayoutProps'.
 ```
 
-**If you are executing a plan before 001 has landed**: run
-`pnpm exec next typegen` once after installing dependencies, then proceed
-normally. This is environment setup, not a deviation from your plan, and not a
-STOP condition — note it in your report and carry on.
+Plan 001 fixed this permanently by making the `typecheck` script
+self-provisioning (`next typegen && tsc --noEmit`), so a fresh worktree that has
+run `pnpm install` now passes without any manual step.
 
-Plan 001 fixes this permanently by making the `typecheck` script
-self-provisioning (`next typegen && tsc --noEmit`).
+**The general lesson, which still applies**: if `pnpm typecheck` fails on a file
+you did not touch, suspect the environment before the code. Any gate that
+depends on generated or installed artefacts can fail for reasons that have
+nothing to do with your change — run `pnpm install --frozen-lockfile`, confirm
+the failure names a file in your diff, and only then treat it as real.
 
 **How this was missed**: the original baseline was measured in a working
 directory that already had a `.next/` from a previous `next dev`. It was caught
@@ -432,9 +443,22 @@ routing around it.
 
 ### Baseline drift since the plans were written
 
-- **228 tests, not 227.** PR #14 (`1ebb266`, "Cover a three-deep overflow
-  chain") added one case to `src/lib/projection.test.ts` after the plans were
-  drafted. Every plan has been updated. Test file count is unchanged at 13.
+The suite has grown from **227 tests across 13 files** when the plans were
+drafted to **293 across 17** at `8f123b3` — and 012 takes it to 302 when it
+lands. The growth is the point: 002 added merge characterization tests, 009
+added the calendar-date modules and pinned `TZ`, 015 made route validation
+unit-testable, and 018 added a Playwright suite that runs separately from
+`pnpm test`.
+
+Two things this history is worth remembering for:
+
+- **A count in a plan is stale the moment another plan lands.** Four plans
+  carried `228` as a hard STOP. Measure, don't assert.
+- **A stale count is not the only environment trap.** `@playwright/test` is
+  declared in `package.json` (018) but a working tree that has not re-installed
+  since will fail `pnpm typecheck` on `playwright.config.ts` alone. A fresh
+  worktree that runs `pnpm install --frozen-lockfile` is unaffected, and so is
+  CI.
 
 ## Findings considered and rejected
 
