@@ -519,8 +519,10 @@ Machine-checkable. ALL must hold:
 - [ ] `pnpm typecheck` exits 0
 - [ ] `pnpm test` exits 0; every pre-existing test still passes, plus at least 7
       new cases for `extractExportedOn`
-- [ ] `pnpm check` exits 0 with no new warnings (still exactly 5, all in
-      `src/lib/google-sheet.ts`)
+- [ ] `pnpm check` exits 0, with the **same warning count you measured in your
+      baseline** and no new warning outside `src/lib/google-sheet.ts`. Do not
+      assert an absolute number: `plans/016` clears those five, so the correct
+      count is 5 before it lands and 0 after.
 - [ ] `pnpm build` exits 0
 - [ ] `grep -n "PARSER_VERSION = 3" src/lib/wealthsimple.ts` returns one match
 - [ ] `grep -n 'transactionDate !== ""' src/lib/wealthsimple.ts` still returns

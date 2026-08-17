@@ -393,8 +393,10 @@ still use `report.open`.
 
 **Verify**: `pnpm typecheck && pnpm test && pnpm check && pnpm build` → exit 0.
 
-**Verify**: `pnpm check` prints exactly 5 warnings, all in
-`src/lib/google-sheet.ts`.
+**Verify**: `pnpm check` prints the same warning count you measured in Step 1,
+with no new warning outside `src/lib/google-sheet.ts`. That count is 5 until
+`plans/016` lands and 0 afterwards, so compare against your own baseline rather
+than against a number written here.
 
 **Verify**: `git status --short` lists only the two in-scope files.
 
@@ -432,8 +434,10 @@ Machine-checkable. ALL must hold:
 
 - [ ] `pnpm typecheck` exits 0
 - [ ] `pnpm test` exits 0; every test in your Step 1 baseline still passes
-- [ ] `pnpm check` exits 0 with exactly 5 warnings, all in
-      `src/lib/google-sheet.ts`
+- [ ] `pnpm check` exits 0, with the **same warning count you measured in your
+      baseline** and no new warning outside `src/lib/google-sheet.ts`. Do not
+      assert an absolute number: `plans/016` clears those five, so the correct
+      count is 5 before it lands and 0 after.
 - [ ] `pnpm build` exits 0
 - [ ] `grep -n "Yahoo returned no USD→CAD history" src/app/api/prices/history/route.ts`
       returns no matches
