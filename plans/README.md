@@ -27,7 +27,7 @@ otherwise.
 | [012](012-mis-scaled-price-parse.md) | Reject a mis-scaled price instead of reading it as a fraction | P2 | S | — | DONE (merged) |
 | [014](014-readme-refresh.md) | Make the README describe the app that exists | P2 | S | — | DONE (merged) |
 | [015](015-route-input-validation.md) | Bound and de-duplicate the API routes' input validation | P2 | M | soft: 010 | DONE (merged) |
-| [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | TODO |
+| [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | DONE — design in [006-ticker-override-design.md](006-ticker-override-design.md) |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (merged) |
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (merged) |
@@ -132,6 +132,36 @@ document, not a feature. They must not modify production code.
   *Judgment call, accepted*: it did **not** name `ws-analytics.vercel.app` in the
   README, reasoning that naming it reads as endorsing public hosting, which the
   plan reserves for the maintainer. Sound — but see the follow-up finding below.
+
+- **006 — COMPLETE (spike).** Deliverable is
+  `plans/006-ticker-override-design.md`. No production code touched; no prototype
+  branch was needed — every question was settled by reading. `typecheck` exits 0
+  and `test` is 17 files / 318, unchanged from baseline. The premise holds: the
+  app still writes an editable `Google ticker` column, still tells the user to
+  edit it, and `grep -n "COLUMNS\." src/lib/price-snapshot.ts` still returns
+  three lines with `COLUMNS.ticker` absent.
+  **Three corrections to the plan, all traceable to plan 010.** (a) `tickersFor`
+  has **two** call sites, not "the single call site" — `:76` for the quote and
+  `:250` inside `historyTickersFor` for the history, over deliberately different
+  symbol sets. (b) Both of Q8's suggested UI homes are wrong for a first slice:
+  `import-prices-dialog.tsx` belongs to the Sheets path, and
+  `holdings-table.tsx` renders `report.open` only, so it structurally cannot
+  reach a closed symbol — which is now exactly what an override matters for.
+  The recommendation is a panel driven by the union of the two *miss* lists.
+  (c) Q9's premise understates the app: an unpriced holding is named in five
+  persistent surfaces, not just a toast; the gap is actionability.
+  **Q3 answered with a mechanism, not a caveat**: overrides are stored only
+  after a resolve-and-confirm round trip, pinned to the security name Yahoo
+  returned, re-checked against that pin on every quote fetch, and **suspended**
+  on mismatch — which degrades a wrong override into the app's existing loud
+  book-cost fallback. The name is already on the wire (`route.ts:121`,
+  `live-prices.ts:40`) and is discarded by `snapshotFromLivePrices`; nothing
+  server-side has to change. No STOP condition fired — notably, no IndexedDB
+  migration is needed, because the schema is derived from the `STORES` list
+  rather than a version constant.
+  Also found, in the doc rather than the plan: `docs/yahoo-pricing-poc.md` §2's
+  comparison table points at "§5" for fixing a bad ticker; the intended target
+  is §6 item 1.
 
 - **007 — COMPLETE (spike), reviewed, APPROVED. Awaiting merge.** Deliverable is
   `plans/007-history-caching-design.md` (477 lines). No production code touched —
