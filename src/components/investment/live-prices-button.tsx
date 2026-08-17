@@ -13,6 +13,7 @@ import {
 	fetchLivePrices,
 	fetchPriceHistory,
 	type LivePriceResponse,
+	MAX_HISTORY_SYMBOLS,
 	snapshotFromLivePrices,
 } from "@/lib/live-prices";
 import { formatCurrency } from "@/lib/metrics";
@@ -36,11 +37,13 @@ import { usePriceStore } from "@/stores/prices";
  * editable when a guess is wrong. This is the fast path, not the replacement —
  * both write the same snapshot, and whichever ran last is what the page shows.
  *
- * Two requests, deliberately in that order. The quote lands in well under a
- * second and lights up every page that asks what things are worth *now*; the
- * monthly history is one Yahoo request per holding and only the analytics page
- * needs it. Waiting for the second before showing the first would make the fast
- * answer as slow as the slow one.
+ * Two requests, deliberately in that order, and over deliberately different
+ * symbol sets. The quote lands in well under a second, asks only about what is
+ * held now, and lights up every page that says what things are worth *now*; the
+ * monthly history is one Yahoo request per symbol, asks about everything ever
+ * held so past years aren't missing the holdings you sold, and only the
+ * analytics page needs it. Waiting for the second before showing the first
+ * would make the fast answer as slow as the slow one.
  */
 
 interface LivePricesButtonProps {
@@ -71,6 +74,7 @@ export function LivePricesButton({
 	const [pending, setPending] = useState<null | "quotes" | "history">(null);
 
 	const symbols = tickersFor(report.open);
+	const historyRequest = historyTickersFor(report, symbols);
 
 	async function fetchPrices() {
 		setPending("quotes");
@@ -111,7 +115,7 @@ export function LivePricesButton({
 		setPending("history");
 		try {
 			const history = historyFromResponse(
-				await fetchPriceHistory(symbols, range.start, range.end),
+				await fetchPriceHistory(historyRequest.symbols, range.start, range.end),
 			);
 			setHistory(history);
 
@@ -122,12 +126,7 @@ export function LivePricesButton({
 
 			toast.success(
 				`Year-by-year values ready across ${years.size} ${years.size === 1 ? "year" : "years"}.`,
-				{
-					description:
-						history.unpriced.length > 0
-							? `No history for ${history.unpriced.join(", ")} — held at book cost in those years.`
-							: "The analytics page now counts what your holdings gained without being sold.",
-				},
+				{ description: describeHistory(history.unpriced, historyRequest) },
 			);
 		} catch (error) {
 			toast.error(
@@ -175,7 +174,11 @@ export function LivePricesButton({
 					<span>
 						Asks Yahoo Finance today&apos;s price for the {symbols.length}{" "}
 						{symbols.length === 1 ? "ticker" : "tickers"} you hold, then the
-						monthly closes behind them. Only those symbols leave this device.
+						monthly closes for {historyRequest.symbols.length}
+						{historyRequest.dropped.length > 0
+							? ` — the most recently held of the ${historyRequest.symbols.length + historyRequest.dropped.length} you've ever held, so the ${historyRequest.dropped.length} oldest ${historyRequest.dropped.length === 1 ? "exit stays" : "exits stay"} at book cost.`
+							: " — every symbol you've ever held, so past years count the holdings you've since sold."}{" "}
+						Only those symbols leave this device.
 					</span>
 					<span>
 						Every page then values your holdings at the market instead of what
@@ -186,6 +189,106 @@ export function LivePricesButton({
 			</TooltipContent>
 		</Tooltip>
 	);
+}
+
+interface HistoryRequest {
+	/** What to ask the history route for, open holdings first. */
+	symbols: { symbol: string; ticker: string }[];
+	/** How many of those are no longer held — the ones this widening added. */
+	closedCount: number;
+	/** Symbols the cap left out, newest-closed kept. Named in the toast. */
+	dropped: string[];
+}
+
+/**
+ * The symbols a *history* request needs, which is not the set a quote needs.
+ *
+ * A quote can only ask about what you hold now. A year-end valuation has to ask
+ * about whatever you held at that year end, so a holding sold in 2023 still has
+ * to be priced for 2021 and 2022 — otherwise `valueYears` re-derives the
+ * position from the activity file, finds no close for it, and carries it at
+ * book cost for years it was actually worth more.
+ *
+ * `report.bySymbol` is the right source: it rolls up *every* position, open and
+ * closed alike, into one row per distinct symbol — which is the granularity the
+ * response is keyed at anyway.
+ *
+ * The cap is the awkward part. `MAX_HISTORY_SYMBOLS` was sized against open
+ * holdings, and this asks about every symbol ever held, so for a portfolio that
+ * has traded a lot it can genuinely bind. Raising it is not the answer — it
+ * exists to bound what a public deployment does to an unofficial upstream API —
+ * so the overflow is dropped deterministically and named out loud: open
+ * holdings are kept first (the market-value tile needs them), then closed ones
+ * most recently closed first, on the reasoning that a recently-closed holding
+ * was held for more of the window the analytics page shows and so prices more
+ * year ends per request spent. The holdings that lose are the oldest, which is
+ * precisely what the earliest years wanted; that cost is real, and the fix for
+ * it is to make this request cheap enough to afford more symbols.
+ */
+function historyTickersFor(
+	report: PositionsReport,
+	open: { symbol: string; ticker: string }[],
+): HistoryRequest {
+	const isOpen = new Set(open.map((entry) => entry.symbol));
+
+	// `bySymbol` already arrives book cost descending, so the open rows are in
+	// the order worth keeping. Closed rows all carry a book cost of zero, which
+	// is why they get sorted on their own terms.
+	const held = report.bySymbol.filter((row) => isOpen.has(row.symbol));
+	const exited = report.bySymbol
+		.filter((row) => !isOpen.has(row.symbol))
+		.sort(
+			(a, b) =>
+				(b.lastTradeDate ?? "").localeCompare(a.lastTradeDate ?? "") ||
+				a.symbol.localeCompare(b.symbol),
+		);
+
+	const ranked = [...held, ...exited];
+	const kept = ranked.slice(0, MAX_HISTORY_SYMBOLS);
+
+	return {
+		symbols: tickersFor(kept),
+		closedCount: kept.filter((row) => !isOpen.has(row.symbol)).length,
+		dropped: ranked.slice(MAX_HISTORY_SYMBOLS).map((row) => row.symbol),
+	};
+}
+
+/**
+ * What changed about the year-by-year numbers, in the order a reader cares.
+ *
+ * Sold holdings being priced is the point of the request, so it leads. A symbol
+ * the cap left out is a different thing from one Yahoo couldn't price, and both
+ * end up at book cost, so both are said — silently dropping either would leave
+ * a number quietly lower than the truth with nothing on screen to explain it.
+ */
+function describeHistory(unpriced: string[], request: HistoryRequest): string {
+	const parts: string[] = [];
+
+	if (request.closedCount > 0) {
+		parts.push(
+			`Includes ${request.closedCount} ${request.closedCount === 1 ? "holding" : "holdings"} you no longer hold, priced for the years you did.`,
+		);
+	}
+
+	if (request.dropped.length > 0) {
+		parts.push(
+			`Left out ${request.dropped.join(", ")} — one request tops out at ${MAX_HISTORY_SYMBOLS} symbols, so the oldest exits went first.`,
+		);
+	}
+
+	if (unpriced.length > 0) {
+		parts.push(
+			`No history for ${unpriced.join(", ")} — held at book cost in those years.`,
+		);
+	}
+
+	if (parts.length === 0) {
+		parts.push(
+			"The analytics page now counts what your holdings gained without being sold.",
+		);
+	}
+
+	return parts.join(" ");
 }
 
 /**
