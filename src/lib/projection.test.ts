@@ -35,8 +35,13 @@ function makePlan(overrides: Partial<ContributionPlan> = {}): ContributionPlan {
 	};
 }
 
-/** Fixed so the date labels are assertable rather than whatever today is. */
-const START = new Date(Date.UTC(2026, 0, 15));
+/**
+ * Fixed so the date labels are assertable rather than whatever today is, and
+ * deliberately at a local *evening* — 21:00 in Toronto is already tomorrow in
+ * UTC, so a fixture pinned to a UTC instant would agree with a UTC-derived
+ * date in every timezone and prove nothing about the local calendar.
+ */
+const START = new Date(2026, 0, 15, 21, 0);
 const AT = { startDate: START };
 
 describe("contributionWeights", () => {
@@ -275,9 +280,24 @@ describe("projectSeries", () => {
 		expect(points).toHaveLength(1);
 	});
 
+	it("dates the projection from the local calendar, not UTC", () => {
+		// 21:00 in Toronto on New Year's Eve is already January 1st in UTC, so
+		// reading the instant's UTC components moved every horizon year forward.
+		// `analytics-overview` slices this year out to say when contribution room
+		// runs out, so the cost of the bug is a wrong year, not a wrong tick.
+		const points = projectSeries({ TFSA: 1000 }, makeInputs({ years: 5 }), {
+			startDate: new Date(2026, 11, 31, 21, 0),
+		});
+
+		expect(points[0].date).toBe("2026-12-31");
+		expect(points[5].date).toBe("2031-12-31");
+	});
+
 	it("clamps a leap-day start back into February", () => {
+		// A leap-day *evening* is already March 1st in UTC, which is what made
+		// the hand-rolled clamp compare March against March and never fire.
 		const points = projectSeries({ TFSA: 1 }, makeInputs({ years: 1 }), {
-			startDate: new Date(Date.UTC(2024, 1, 29)),
+			startDate: new Date(2024, 1, 29, 21, 0),
 		});
 
 		expect(points[1].date).toBe("2025-02-28");

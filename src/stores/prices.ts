@@ -76,11 +76,18 @@ export const usePriceStore = create<PriceState>((set, get) => {
 		},
 
 		setSnapshot: (snapshot) => {
-			set({ snapshot });
 			// The write is best-effort, as it is in `dataset.ts` — the session keeps
 			// working either way. But it is *reported*: swallowing the error would
 			// leave someone believing their prices are saved when they will be gone
 			// on reload, which is worse than losing them loudly.
+			//
+			// The flag comes down here, as each attempt starts, so it describes the
+			// most recent write rather than latching on the first failure someone
+			// ever hit. Without this a reader who filled their disk once, freed
+			// space and fetched again was still told their prices would vanish —
+			// while they were in fact saved. A false data-loss warning is corrosive
+			// in an app whose whole premise is that the data stays on the device.
+			set({ persistFailed: false, snapshot });
 			void savePriceSnapshot(snapshot).catch((error) => {
 				console.warn("Could not save prices to local storage:", error);
 				set({ persistFailed: true });
@@ -88,7 +95,9 @@ export const usePriceStore = create<PriceState>((set, get) => {
 		},
 
 		setHistory: (history) => {
-			set({ history });
+			// Same shape as `setSnapshot` above, deliberately — the two are parallel
+			// and a reader comparing them should find nothing to explain.
+			set({ history, persistFailed: false });
 			void savePriceHistory(history).catch((error) => {
 				console.warn("Could not save price history to local storage:", error);
 				set({ persistFailed: true });
