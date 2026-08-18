@@ -30,7 +30,7 @@ otherwise.
 | [006](006-ticker-override-spike.md) | Design a per-symbol ticker override (**spike**) | P2 | M | — | DONE — design in [006-ticker-override-design.md](006-ticker-override-design.md) |
 | [007](007-history-caching-spike.md) | Design caching for the price-history route (**spike**) | P2 | M | — | DONE (merged) |
 | [008](008-export-as-of-timestamp.md) | Capture the export's "As of" timestamp and show file freshness | P2 | S | **004** | DONE (merged) |
-| [020](020-projection-anniversary-utc.md) | Date the projection from the local clock; clear a stale save warning | P2 | S | — | TODO |
+| [020](020-projection-anniversary-utc.md) | Date the projection from the local clock; clear a stale save warning | P2 | S | — | DONE (not merged) |
 | [019](019-hydrate-concurrency-latch.md) | Stop `hydrate()` racing itself and deleting the file it protected | **P1** | S | — | DONE (merged) |
 | [018](018-e2e-data-loss-paths.md) | Cover the data-loss paths with Playwright | P2 | M | **004 + 005** | DONE (merged) |
 | [016](016-small-cleanups.md) | Clear the small stuff: misplaced dep, dead vars, a bad edge case | P3 | S | — | DONE (merged) |
