@@ -1,3 +1,5 @@
+import { addMonths, toLocalIso } from "@/lib/calendar-date";
+
 /**
  * A compound-growth model over the account types the export contains.
  *
@@ -144,21 +146,22 @@ export function contributionWeights(
 	);
 }
 
-/** The anniversary of `start`, `years` on. Clamps Feb 29 to Feb 28. */
+/**
+ * The anniversary of `start`, `years` on, as a local calendar date.
+ *
+ * `start` is an instant; the projection is dated by the day the reader is
+ * having, so the calendar date comes from the local clock. Reading the UTC
+ * components instead moved every date a day forward for anyone west of
+ * Greenwich in the evening — and on New Year's Eve moved the *year*, which
+ * `analytics-overview.tsx` shows as "room runs out in ⟨year⟩".
+ *
+ * `addMonths` clamps the day to the target month's length, which is where the
+ * hand-rolled Feb 29 → Feb 28 step used to happen. That branch was itself
+ * broken on a leap-day evening: the instant was already March in UTC, so it
+ * compared March against March and never fired.
+ */
 function anniversary(start: Date, years: number): string {
-	const date = new Date(
-		Date.UTC(
-			start.getUTCFullYear() + years,
-			start.getUTCMonth(),
-			start.getUTCDate(),
-		),
-	);
-	// A Feb 29 start rolls into Mar 1 on a non-leap year; step back a day so the
-	// axis label stays in the month the reader expects.
-	if (date.getUTCMonth() !== start.getUTCMonth()) {
-		date.setUTCDate(0);
-	}
-	return date.toISOString().slice(0, 10);
+	return addMonths(toLocalIso(start), years * 12);
 }
 
 export interface ProjectionOptions {
