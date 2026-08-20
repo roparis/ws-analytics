@@ -3,6 +3,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { AssumptionsPanel } from "@/components/analytics/assumptions-panel";
+import { SectorBreakdown } from "@/components/analytics/sector-breakdown";
 import { YearAccountDetail } from "@/components/analytics/year-account-detail";
 import { YearAccountMatrix } from "@/components/analytics/year-account-matrix";
 import { buildSeries } from "@/components/charts/account-type-series";
@@ -58,6 +59,7 @@ export function AnalyticsOverview() {
 	const dataset = useDatasetStore((state) => state.dataset);
 	const snapshot = usePriceStore((state) => state.snapshot);
 	const history = usePriceStore((state) => state.history);
+	const profiles = usePriceStore((state) => state.profiles);
 	const inputs = useProjectionStore((state) => state.inputs);
 	const overrides = useProjectionStore((state) => state.overrides);
 	const mode = useProjectionStore((state) => state.mode);
@@ -291,6 +293,13 @@ export function AnalyticsOverview() {
 
 			<YearAccountDetail currency={currency} stats={stats} totals={totals} />
 
+			<SectorBreakdown
+				currency={currency}
+				profiles={profiles}
+				report={report}
+				snapshot={snapshot}
+			/>
+
 			<Card>
 				<CardHeader>
 					<CardTitle>What this page can't tell you</CardTitle>
@@ -300,8 +309,8 @@ export function AnalyticsOverview() {
 									history
 										? "The year-by-year value and total return use each year's closing prices and the share count you held at the time, so a year you added to counts what the new shares did too — but a price is one number a day, and nothing here knows what you were charged in spreads. "
 										: "The year columns still count only what was sold, because a year-end value needs that year's prices — fetch them above. "
-								}Everything left of the projection is measured; everything right of it is an assumption you made.`
-							: "A Wealthsimple activities export contains no prices and no position snapshot, so the app knows what you paid and what you received, never what your holdings are worth. That means no portfolio value, no total return, and no unrealised gain — and it means the projection above starts from book cost until you fetch prices or type in the real figures. Everything left of the projection is measured; everything right of it is an assumption you made."}
+								}Everything left of the projection is measured; everything right of it is an assumption you made. The sector breakdown below has the same ceiling in a different shape: Yahoo publishes today's weights, never a history of them, so there is no year-by-year version of it — and a fund's dollars carry no industry, because Yahoo publishes a fund's sector mix but never what sits inside each sector.`
+							: "A Wealthsimple activities export contains no prices and no position snapshot, so the app knows what you paid and what you received, never what your holdings are worth. That means no portfolio value, no total return, and no unrealised gain — and it means the projection above starts from book cost until you fetch prices or type in the real figures. Everything left of the projection is measured; everything right of it is an assumption you made. The sector breakdown below has the same ceiling in a different shape: Yahoo publishes today's weights, never a history of them, so there is no year-by-year version of it — and a fund's dollars carry no industry, because Yahoo publishes a fund's sector mix but never what sits inside each sector."}
 					</CardDescription>
 				</CardHeader>
 			</Card>

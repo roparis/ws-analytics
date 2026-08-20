@@ -98,6 +98,85 @@ export interface PriceHistoryResponse {
 }
 
 /**
+ * The third call: what each holding actually *is*.
+ *
+ * A quote says what a holding is worth and a chart says what it was worth.
+ * Neither says whether it is a bank, an oil producer, or an index fund holding
+ * some of both. The export carries no security metadata beyond ticker and name
+ * (`docs/wealthsimple-csv-format.md` §8), so this is the only door to it.
+ *
+ * One upstream request per symbol, as history is — Yahoo's `quoteSummary` takes
+ * a single ticker. Unlike history, the answer barely moves, which is what makes
+ * the stored copy worth far more here than a cached price would be.
+ */
+export interface ProfileRequest {
+	symbols: PriceRequestSymbol[];
+}
+
+/**
+ * What kind of instrument Yahoo thinks a ticker is.
+ *
+ * The three that matter answer in three different places, which is why the
+ * result type below has as many nullable fields as it does:
+ *
+ * - **`equity`** carries `sector` and `industry`. `AAPL` is "Technology" /
+ *   "Consumer Electronics".
+ * - **`fund`** carries no sector of its own — `assetProfile.sector` is null for
+ *   every ETF checked — and reports `sectorWeights`, the mix of what it holds.
+ * - **`crypto`** carries nothing at all. Yahoo knows `BTC-CAD`'s price and no
+ *   more, so a coin is classified from the export's own `listing` instead.
+ */
+export type ProfileKind = "equity" | "fund" | "crypto" | "other";
+
+export interface SecurityProfileResult extends PriceRequestSymbol {
+	kind: ProfileKind;
+	/** Equities only; null for every fund. Display text — group holdings on `sectorKey` instead. */
+	sector: string | null;
+	/**
+	 * Equities only, normalized to the same vocabulary `sectorWeights` uses.
+	 *
+	 * Yahoo speaks two dialects of its own taxonomy: `assetProfile.sectorKey`
+	 * is hyphenated (`"real-estate"`), `topHoldings.sectorWeightings` is
+	 * snake_case with no separator for real estate at all (`"realestate"`).
+	 * Grouping an equity's holding by `sector` text and a fund's by a
+	 * weightings key would put the same sector in two different buckets — this
+	 * field is normalized at the route so every caller can group on it
+	 * directly, equities and funds alike.
+	 */
+	sectorKey: string | null;
+	/** Equities only. No fund reports one — see `sectorWeights`. */
+	industry: string | null;
+	/** Funds: Morningstar's category. Null for most TSX-listed funds. */
+	categoryName: string | null;
+	/** Funds: the manager. Present where `categoryName` often isn't. */
+	family: string | null;
+	/**
+	 * Sector key -> fraction **of the fund's equity sleeve**, summing to 1.
+	 *
+	 * Of the sleeve, not of the fund, and the difference is not rounding:
+	 * `VFV.TO` returns weights summing to exactly 1.0000 alongside a
+	 * `stockPosition` of 0.9957. Multiplying a holding's value by a weight
+	 * without scaling by `stockPosition` first hands the cash and bond
+	 * remainder out to the sectors, and the breakdown stops reconciling with
+	 * the holdings total. `CASH.TO` is the degenerate case — every weight
+	 * zero, all of it cash.
+	 */
+	sectorWeights: Record<string, number> | null;
+	/** Fraction of the fund in equities: the multiplier `sectorWeights` needs. */
+	stockPosition: number | null;
+	bondPosition: number | null;
+	cashPosition: number | null;
+	otherPosition: number | null;
+}
+
+export interface ProfileResponse {
+	fetchedAt: string;
+	profiles: SecurityProfileResult[];
+	/** Same shape and same rule as a price miss: named, never zeroed. */
+	misses: LivePriceMiss[];
+}
+
+/**
  * The most symbols one request may carry.
  *
  * Yahoo takes a comma-separated list and answers in one round trip, so the cap
@@ -119,11 +198,24 @@ export const MAX_SYMBOLS = 100;
  */
 export const MAX_HISTORY_SYMBOLS = 60;
 
+/**
+ * The profile route's ceiling.
+ *
+ * `quoteSummary` takes one ticker per call, so this route amplifies exactly as
+ * history does — same reasoning, same number. Held deliberately as its own
+ * constant rather than an alias: the two routes are free to diverge, and a
+ * shared name would make a change to one look like a change to both.
+ */
+export const MAX_PROFILE_SYMBOLS = 60;
+
 /** Where the browser sends its list. */
 export const PRICES_ENDPOINT = "/api/prices";
 
 /** And where it asks for the same list's past. */
 export const HISTORY_ENDPOINT = "/api/prices/history";
+
+/** And where it asks what those symbols are. */
+export const PROFILES_ENDPOINT = "/api/profiles";
 
 /**
  * Folds a response into the same `PriceSnapshot` the Sheets import produces.
@@ -200,6 +292,25 @@ export async function fetchPriceHistory(
 		symbols,
 		to,
 	} satisfies PriceHistoryRequest);
+}
+
+/**
+ * Asks the route what the symbols are — sector, industry, or a fund's mix.
+ *
+ * Callers should narrow `symbols` to what isn't already on hand before calling
+ * this: a profile barely changes, so `usePriceStore`'s stored copy is the cache
+ * and a repeat visit should ask Yahoo for nothing at all.
+ */
+export async function fetchProfiles(
+	symbols: PriceRequestSymbol[],
+): Promise<ProfileResponse> {
+	if (symbols.length === 0) {
+		return { fetchedAt: todayLocalIso(), misses: [], profiles: [] };
+	}
+	guard(symbols);
+	return post<ProfileResponse>(PROFILES_ENDPOINT, {
+		symbols,
+	} satisfies ProfileRequest);
 }
 
 // Tickers go into a query string; Yahoo's own alphabet is letters, digits and

@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import { daysBetween, todayLocalIso } from "@/lib/calendar-date";
-import type { PositionsReport } from "@/lib/positions";
+import type { Position, PositionsReport } from "@/lib/positions";
 
 /**
  * Reads prices back out of the workbook this app exported.
@@ -181,6 +181,29 @@ export interface ValuedReport {
 }
 
 /**
+ * One position's value against a snapshot — the atom every overlay that
+ * values a holding builds on, so a change to how an unpriced holding is
+ * valued can't land in one overlay and leave another silently disagreeing.
+ * `marketValue` is null exactly when the snapshot has no price for this
+ * symbol; `bookCost` is always available, since every caller falls back to it.
+ */
+export interface PositionValue {
+	marketValue: number | null;
+	bookCost: number;
+}
+
+export function valuePosition(
+	position: Pick<Position, "symbol" | "shares" | "bookCost">,
+	snapshot: PriceSnapshot | null,
+): PositionValue {
+	const price = snapshot?.pricesCad[position.symbol];
+	return {
+		bookCost: position.bookCost,
+		marketValue: price !== undefined ? position.shares * price : null,
+	};
+}
+
+/**
  * Applies a snapshot to a report without touching it.
  *
  * A separate overlay rather than an option on `buildPositions`: that function
@@ -213,16 +236,16 @@ export function valueWith(
 		const row = byType.get(position.accountType);
 		if (!row) continue;
 
-		const price = snapshot.pricesCad[position.symbol];
-		if (price === undefined) {
+		const { marketValue, bookCost } = valuePosition(position, snapshot);
+		if (marketValue === null) {
 			missing.add(position.symbol);
-			row.unpricedBookCost += position.bookCost;
+			row.unpricedBookCost += bookCost;
 			continue;
 		}
 
 		priced += 1;
-		row.marketValue += position.shares * price;
-		row.pricedBookCost += position.bookCost;
+		row.marketValue += marketValue;
+		row.pricedBookCost += bookCost;
 	}
 
 	for (const row of byType.values()) {

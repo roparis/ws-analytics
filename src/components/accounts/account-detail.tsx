@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ActivitiesTable } from "@/components/activities-table";
+import { SectorBreakdown } from "@/components/analytics/sector-breakdown";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import { MonthBreakdownChart } from "@/components/charts/month-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
@@ -18,7 +19,9 @@ import {
 	formatDate,
 	matchDatasetValue,
 } from "@/lib/metrics";
+import { buildPositions } from "@/lib/positions";
 import { useDatasetStore } from "@/stores/dataset";
+import { usePriceStore } from "@/stores/prices";
 
 export function AccountDetail({
 	typeParam,
@@ -28,6 +31,8 @@ export function AccountDetail({
 	accountId: string;
 }) {
 	const dataset = useDatasetStore((state) => state.dataset);
+	const snapshot = usePriceStore((state) => state.snapshot);
+	const profiles = usePriceStore((state) => state.profiles);
 
 	const accountType = dataset
 		? matchDatasetValue(dataset.accountTypes, typeParam)
@@ -51,6 +56,19 @@ export function AccountDetail({
 	}, [dataset, resolvedId]);
 
 	const kpis = useMemo(() => computeKpis(scoped), [scoped]);
+	// This account's own holdings — `scoped` is already narrowed to one
+	// account, so the report `breakdownBySector` reads from is too. Skipped
+	// (the cheap empty-activities call instead) when no profile has ever been
+	// fetched: `SectorBreakdown` renders only its empty-state paragraph in
+	// that case, so walking every activity to build a report nobody reads
+	// would be pure waste on every visit to this page.
+	const report = useMemo(
+		() =>
+			profiles
+				? buildPositions(scoped, { sources: dataset?.sources })
+				: buildPositions([], {}),
+		[scoped, dataset, profiles],
+	);
 
 	if (!dataset) return null;
 
@@ -100,6 +118,14 @@ export function AccountDetail({
 			/>
 
 			<KpiCards currency={currency} isAccountFiltered kpis={kpis} />
+
+			<SectorBreakdown
+				currency={currency}
+				profiles={profiles}
+				report={report}
+				snapshot={snapshot}
+			/>
+
 			<YearAnalytics
 				accountType={accountType}
 				activities={scoped}

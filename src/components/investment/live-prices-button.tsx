@@ -12,14 +12,19 @@ import {
 import {
 	fetchLivePrices,
 	fetchPriceHistory,
+	fetchProfiles,
 	type LivePriceResponse,
 	MAX_HISTORY_SYMBOLS,
+	MAX_PROFILE_SYMBOLS,
+	type ProfileResponse,
 	snapshotFromLivePrices,
 } from "@/lib/live-prices";
 import { formatCurrency } from "@/lib/metrics";
 import type { PositionsReport } from "@/lib/positions";
 import { historyFromResponse } from "@/lib/price-history";
 import { valueWith } from "@/lib/price-snapshot";
+import type { ProfileStore } from "@/lib/sectors";
+import { symbolsNeedingProfiles } from "@/lib/sectors";
 import { tickersFor } from "@/lib/yahoo-ticker";
 import { usePriceStore } from "@/stores/prices";
 
@@ -37,13 +42,19 @@ import { usePriceStore } from "@/stores/prices";
  * editable when a guess is wrong. This is the fast path, not the replacement —
  * both write the same snapshot, and whichever ran last is what the page shows.
  *
- * Two requests, deliberately in that order, and over deliberately different
+ * Three requests, deliberately in that order, and over deliberately different
  * symbol sets. The quote lands in well under a second, asks only about what is
  * held now, and lights up every page that says what things are worth *now*; the
  * monthly history is one Yahoo request per symbol, asks about everything ever
  * held so past years aren't missing the holdings you sold, and only the
  * analytics page needs it. Waiting for the second before showing the first
  * would make the fast answer as slow as the slow one.
+ *
+ * The third leg — what sector each holding is in — trails both, and for a
+ * reason neither of the others has: it is worth *not* asking about most of
+ * the time. A profile barely changes, so `symbolsNeedingProfiles` narrows the
+ * request to symbols this device has never classified or classified over a
+ * month ago; a repeat click on an already-classified portfolio sends nothing.
  */
 
 interface LivePricesButtonProps {
@@ -71,7 +82,11 @@ export function LivePricesButton({
 }: LivePricesButtonProps) {
 	const setSnapshot = usePriceStore((state) => state.setSnapshot);
 	const setHistory = usePriceStore((state) => state.setHistory);
-	const [pending, setPending] = useState<null | "quotes" | "history">(null);
+	const profileStore = usePriceStore((state) => state.profiles);
+	const addProfiles = usePriceStore((state) => state.addProfiles);
+	const [pending, setPending] = useState<
+		null | "quotes" | "history" | "profiles"
+	>(null);
 
 	const symbols = tickersFor(report.open);
 	const historyRequest = historyTickersFor(report, symbols);
@@ -137,6 +152,58 @@ export function LivePricesButton({
 		} finally {
 			setPending(null);
 		}
+
+		// Same "leave what already worked standing" rule as the history leg — a
+		// failed classification shouldn't cast doubt on the price or the history
+		// that already landed. Skipped entirely, not just quietly empty, when
+		// nothing needs asking: no pending state to flash, no request to send.
+		const needed = new Set(
+			symbolsNeedingProfiles(
+				symbols.map((entry) => entry.symbol),
+				profileStore,
+			),
+		);
+		const toClassifyAll = symbols.filter((entry) => needed.has(entry.symbol));
+		if (toClassifyAll.length === 0) return;
+
+		// Same cap-and-name pattern as `historyTickersFor` — this route
+		// amplifies exactly as history does (one Yahoo request per symbol), so
+		// it inherits the same ceiling, and the reader deserves to know when
+		// something got left out rather than seeing a request silently 400.
+		const toClassify = toClassifyAll.slice(0, MAX_PROFILE_SYMBOLS);
+		const droppedProfiles = toClassifyAll
+			.slice(MAX_PROFILE_SYMBOLS)
+			.map((entry) => entry.symbol);
+
+		setPending("profiles");
+		try {
+			const response = await fetchProfiles(toClassify);
+			const entries: ProfileStore = {};
+			for (const profile of response.profiles) {
+				entries[profile.symbol] = { fetchedAt: response.fetchedAt, profile };
+			}
+			// A confirmed miss is cached too, the same as a real profile — Yahoo
+			// not classifying a symbol barely changes, and without this the
+			// symbol would fail `symbolsNeedingProfiles` forever and be
+			// re-requested from Yahoo on every single click.
+			for (const miss of response.misses) {
+				entries[miss.symbol] = { fetchedAt: response.fetchedAt, profile: null };
+			}
+			addProfiles(entries);
+
+			toast.success(
+				`${response.profiles.length} of ${toClassify.length} classified.`,
+				{ description: describeProfiles(response, droppedProfiles) },
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? `Prices and history are in, but sectors aren't: ${error.message}`
+					: "Couldn't fetch sector data.",
+			);
+		} finally {
+			setPending(null);
+		}
 	}
 
 	const label =
@@ -144,7 +211,9 @@ export function LivePricesButton({
 			? "Fetching prices…"
 			: pending === "history"
 				? "Fetching history…"
-				: "Fetch live prices";
+				: pending === "profiles"
+					? "Classifying holdings…"
+					: "Fetch live prices";
 
 	return (
 		<Tooltip>
@@ -182,7 +251,8 @@ export function LivePricesButton({
 					</span>
 					<span>
 						Every page then values your holdings at the market instead of what
-						you paid, and the analytics page gains its year-by-year columns.
+						you paid, and the analytics page gains its year-by-year columns and
+						a sector breakdown.
 					</span>
 					{hint}
 				</span>
@@ -286,6 +356,37 @@ function describeHistory(unpriced: string[], request: HistoryRequest): string {
 		parts.push(
 			"The analytics page now counts what your holdings gained without being sold.",
 		);
+	}
+
+	return parts.join(" ");
+}
+
+/**
+ * What changed about the sector breakdown. Short by design: unlike a quote or
+ * a history bar, a miss here isn't "no price" — a bond, an index, or a fund
+ * Yahoo reports no weights for genuinely has no sector to give, and the page
+ * already says so per-holding rather than repeating it in every toast.
+ */
+function describeProfiles(
+	response: ProfileResponse,
+	dropped: string[],
+): string {
+	const parts: string[] = [];
+
+	if (response.misses.length > 0) {
+		parts.push(
+			`Yahoo doesn't classify ${response.misses.map((miss) => miss.symbol).join(", ")} — left out of the sector breakdown.`,
+		);
+	}
+
+	if (dropped.length > 0) {
+		parts.push(
+			`Left out ${dropped.join(", ")} — one request tops out at ${MAX_PROFILE_SYMBOLS} symbols.`,
+		);
+	}
+
+	if (parts.length === 0) {
+		parts.push("Ready on the analytics page.");
 	}
 
 	return parts.join(" ");

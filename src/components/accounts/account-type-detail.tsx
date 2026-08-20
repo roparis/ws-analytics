@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { AccountCard } from "@/components/accounts/account-card";
 import { ActivitiesTable } from "@/components/activities-table";
+import { SectorBreakdown } from "@/components/analytics/sector-breakdown";
 import { CapitalChart } from "@/components/charts/capital-chart";
 import { YearBreakdownChart } from "@/components/charts/year-breakdown-chart";
 import { HeadlineFigures } from "@/components/headline-figures";
@@ -20,10 +21,14 @@ import {
 	groupByAccount,
 	matchDatasetValue,
 } from "@/lib/metrics";
+import { buildPositions } from "@/lib/positions";
 import { useDatasetStore } from "@/stores/dataset";
+import { usePriceStore } from "@/stores/prices";
 
 export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 	const dataset = useDatasetStore((state) => state.dataset);
+	const snapshot = usePriceStore((state) => state.snapshot);
+	const profiles = usePriceStore((state) => state.profiles);
 
 	const accountType = dataset
 		? matchDatasetValue(dataset.accountTypes, typeParam)
@@ -41,6 +46,20 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 
 	const kpis = useMemo(() => computeKpis(scoped), [scoped]);
 	const accounts = useMemo(() => groupByAccount(scoped), [scoped]);
+	// Positions, not just cash flow — the sector breakdown needs open holdings,
+	// and building it from `scoped` rather than the whole dataset is what makes
+	// "invested in" mean *this account type's* holdings, not every account's.
+	// Skipped (the cheap empty-activities call instead) when no profile has
+	// ever been fetched: `SectorBreakdown` renders only its empty-state
+	// paragraph in that case, so walking every activity to build a report
+	// nobody reads would be pure waste on every visit to this page.
+	const report = useMemo(
+		() =>
+			profiles
+				? buildPositions(scoped, { sources: dataset?.sources })
+				: buildPositions([], {}),
+		[scoped, dataset, profiles],
+	);
 
 	if (!dataset) return null;
 
@@ -105,6 +124,13 @@ export function AccountTypeDetail({ typeParam }: { typeParam: string }) {
 					))}
 				</div>
 			</section>
+
+			<SectorBreakdown
+				currency={currency}
+				profiles={profiles}
+				report={report}
+				snapshot={snapshot}
+			/>
 
 			<YearAnalytics
 				accountType={accountType}
