@@ -4,11 +4,14 @@ import { create } from "zustand";
 import { once } from "@/lib/once";
 import type { PriceHistory } from "@/lib/price-history";
 import type { PriceSnapshot } from "@/lib/price-snapshot";
+import type { ProfileStore } from "@/lib/sectors";
 import {
 	loadPriceHistory,
 	loadPriceSnapshot,
+	loadSecurityProfiles,
 	savePriceHistory,
 	savePriceSnapshot,
+	saveSecurityProfiles,
 } from "@/lib/storage";
 
 /**
@@ -29,6 +32,8 @@ interface PriceState {
 	snapshot: PriceSnapshot | null;
 	/** Monthly closes for the years the export covers. Null until fetched. */
 	history: PriceHistory | null;
+	/** Sector/industry classification per symbol. Null until fetched. */
+	profiles: ProfileStore | null;
 	/** False until IndexedDB has been read, so the UI can avoid flashing empty. */
 	hydrated: boolean;
 	/** Set when the snapshot couldn't be written — it won't survive a reload. */
@@ -36,6 +41,16 @@ interface PriceState {
 	hydrate: () => Promise<void>;
 	setSnapshot: (snapshot: PriceSnapshot) => void;
 	setHistory: (history: PriceHistory) => void;
+	/**
+	 * Merges newly-fetched entries into the stored profiles rather than
+	 * replacing them.
+	 *
+	 * Unlike a snapshot or a history, a profile fetch is deliberately partial —
+	 * `symbolsNeedingProfiles` asks Yahoo only for what's missing or stale — so
+	 * overwriting the whole store on every call would discard everything a
+	 * prior visit already paid for.
+	 */
+	addProfiles: (entries: ProfileStore) => void;
 	clear: () => void;
 	/**
 	 * Drops the snapshot from memory without writing. For callers that have
@@ -52,21 +67,23 @@ export const usePriceStore = create<PriceState>((set, get) => {
 	// check-then-act shape and, unlike this one, an unsafe `set`.
 	const runHydration = once(async () => {
 		try {
-			const [snapshot, history] = await Promise.all([
+			const [snapshot, history, profiles] = await Promise.all([
 				loadPriceSnapshot(),
 				loadPriceHistory(),
+				loadSecurityProfiles(),
 			]);
-			set({ hydrated: true, history, snapshot });
+			set({ history, hydrated: true, profiles, snapshot });
 		} catch {
 			// A refused or corrupt database shouldn't stop the app loading; the
 			// page falls back to book cost, which is what it did before.
-			set({ hydrated: true, history: null, snapshot: null });
+			set({ history: null, hydrated: true, profiles: null, snapshot: null });
 		}
 	});
 
 	return {
 		snapshot: null,
 		history: null,
+		profiles: null,
 		hydrated: false,
 		persistFailed: false,
 
@@ -104,18 +121,43 @@ export const usePriceStore = create<PriceState>((set, get) => {
 			});
 		},
 
+		addProfiles: (entries) => {
+			const merged = { ...get().profiles, ...entries };
+			set({ persistFailed: false, profiles: merged });
+			void saveSecurityProfiles(merged).catch((error) => {
+				console.warn(
+					"Could not save security profiles to local storage:",
+					error,
+				);
+				set({ persistFailed: true });
+			});
+		},
+
 		clear: () => {
-			set({ history: null, persistFailed: false, snapshot: null });
+			set({
+				history: null,
+				persistFailed: false,
+				profiles: null,
+				snapshot: null,
+			});
 			void savePriceSnapshot(null).catch((error) => {
 				console.warn("Could not clear stored prices:", error);
 			});
 			void savePriceHistory(null).catch((error) => {
 				console.warn("Could not clear stored price history:", error);
 			});
+			void saveSecurityProfiles(null).catch((error) => {
+				console.warn("Could not clear stored security profiles:", error);
+			});
 		},
 
 		reset: () => {
-			set({ history: null, persistFailed: false, snapshot: null });
+			set({
+				history: null,
+				persistFailed: false,
+				profiles: null,
+				snapshot: null,
+			});
 		},
 	};
 });

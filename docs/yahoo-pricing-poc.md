@@ -5,8 +5,8 @@
 `/analytics` that values your holdings against Yahoo Finance in one click,
 instead of the export-to-Sheets and import-the-CSV-back round trip — and, from
 the same click, a year-by-year valuation that finally puts unrealised gain on
-the analytics page (§7) and a value line beside net deposits in every page's
-lead chart (§5.1).
+the analytics page (§7), a value line beside net deposits in every page's lead
+chart (§5.1), and a sector/industry breakdown of what's actually held (§8).
 
 ---
 
@@ -234,15 +234,20 @@ pnpm dev
 ```
 
 Load an activities CSV, open **Investments** or **Analytics**, and click
-**Fetch live prices**. Two toasts follow: the quote lands in well under a
-second, and the monthly history a few seconds later. The first reports how many
-holdings priced, the USD→CAD rate if anything needed converting, and any symbol
-Yahoo couldn't quote; the second reports how many years it could value.
+**Fetch live prices**. Three toasts follow: the quote lands in well under a
+second, the monthly history a few seconds later, and the sector classification
+last — skipped with no toast at all once every holding is already classified
+and fresh. The first reports how many holdings priced, the USD→CAD rate if
+anything needed converting, and any symbol Yahoo couldn't quote; the second
+reports how many years it could value; the third names anything Yahoo couldn't
+classify. The sector breakdown itself lives on the analytics page, below the
+year-by-year table.
 
-If the history fails the snapshot stands — the investment page is already
-correct, and the analytics page falls back to book cost.
+If the history or the classification fails, the snapshot stands — the
+investment page is already correct, and each later leg falls back to what it
+did before this existed, independently of the others.
 
-Either route can be exercised on its own:
+Any route can be exercised on its own:
 
 ```bash
 curl -s -X POST http://localhost:3000/api/prices -H 'content-type: application/json' -d '{"symbols":[{"symbol":"VFV","ticker":"VFV.TO"},{"symbol":"VTI","ticker":"VTI"},{"symbol":"BTC","ticker":"BTC-CAD"}]}'
@@ -250,4 +255,66 @@ curl -s -X POST http://localhost:3000/api/prices -H 'content-type: application/j
 
 ```bash
 curl -s -X POST http://localhost:3000/api/prices/history -H 'content-type: application/json' -d '{"from":"2022-03-31","to":"2026-08-10","symbols":[{"symbol":"VFV","ticker":"VFV.TO"},{"symbol":"VTI","ticker":"VTI"}]}'
+```
+
+## 8. Sector and industry, the third route
+
+A quote says what a holding is worth; the history says what it was worth. Neither
+says what it *is* — a `VFV.TO` and a `SHOP.TO` quote exactly the same way, but
+one is 500 companies and the other is one. The export has no security metadata
+beyond ticker and name (§8 of the CSV format doc) to tell them apart, so this is
+entirely Yahoo's answer, fetched the same way the other two are:
+[src/app/api/profiles/route.ts](../src/app/api/profiles/route.ts), via
+`yahooFinance.quoteSummary(ticker, { modules: ["quoteType", "assetProfile",
+"fundProfile", "topHoldings"] })`.
+
+Two things about what Yahoo actually returns are easy to get wrong, and both
+determine how `src/lib/sectors.ts` reads the response:
+
+- **A fund reports no sector of its own.** `assetProfile.sector` is `null` for
+  every ETF checked — `VFV.TO`, `XEQT.TO`, `VTI`. What a fund carries instead is
+  `topHoldings.sectorWeightings`, the look-through mix of what it holds. There is
+  no equivalent for industry: `topHoldings` has no `industryWeightings` field,
+  and its `holdings` list is a top-holdings summary (for `VFV.TO`, one entry —
+  `VOO: 100%`), not a security-by-security breakdown. A fund can be attributed
+  to a sector; it cannot, from this API, be attributed to an industry. The UI
+  says so rather than inventing one.
+- **The weights are normalised to the equity sleeve, not to the fund.**
+  `VFV.TO`'s `sectorWeightings` sum to exactly `1.0000` while its
+  `stockPosition` is `0.9957` — the rest sits in cash (`0.0022`) and "other"
+  (`0.0020`). A weight applied to a holding's full value without first scaling
+  by `stockPosition` hands that remainder to the sectors for free, and the
+  breakdown stops reconciling with what the fund is actually worth.
+  `sectors.ts` scales every sector weight by `stockPosition` and gives the
+  `bondPosition`/`cashPosition`/`otherPosition` sleeves their own slices, plus a
+  residual for whatever those four don't cover — a fund with a preferred or
+  convertible allocation this app doesn't ask Yahoo for still has its full value
+  land somewhere.
+
+Two smaller findings, both handled as misses rather than guesses: `quoteType`
+gives the instrument kind (`EQUITY`, `ETF`, `MUTUALFUND`, `CRYPTOCURRENCY`), and
+a `CRYPTOCURRENCY` quote carries no sector, category, or weights at all —
+`BTC-CAD`'s profile is classified from the export's own `listing` instead, the
+same way its ticker is guessed rather than looked up. And Yahoo speaks two
+dialects of its own sector vocabulary: `assetProfile.sectorKey` is hyphenated
+(`real-estate`), `topHoldings.sectorWeightings` keys are snake_case with no
+separator at all for real estate (`realestate`) — the route normalises the
+former to the latter so an equity and a fund's look-through land in the same
+bucket rather than two.
+
+The route amplifies exactly as the history route does — one Yahoo request per
+symbol — and inherits the same `queue: { concurrency: 4 }` for the same reason.
+It is, however, the one of the three most worth caching: a company's sector
+essentially never changes, and a fund's weights drift quarterly at most.
+`usePriceStore` persists every profile it fetches, keyed by symbol with the
+instant it was fetched, and `symbolsNeedingProfiles` narrows a request to
+symbols never profiled or profiled over 30 days ago — so a repeat click on an
+already-classified portfolio sends nothing at all. Client-side narrowing against
+the app's own stored copy, in other words, not a server-side cache — the same
+choice §6.6 makes for history, for the same reason: a shared cache on a
+deployed instance would make the operator retain which symbols were looked up
+for longer than a single request needs to.
+
+```bash
+curl -s -X POST http://localhost:3000/api/profiles -H 'content-type: application/json' -d '{"symbols":[{"symbol":"VFV","ticker":"VFV.TO"},{"symbol":"AAPL","ticker":"AAPL"},{"symbol":"BTC","ticker":"BTC-CAD"}]}'
 ```

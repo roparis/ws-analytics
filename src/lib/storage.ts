@@ -1,6 +1,7 @@
 import type { SourceFile } from "@/lib/merge";
 import type { PriceHistory } from "@/lib/price-history";
 import type { PriceSnapshot } from "@/lib/price-snapshot";
+import type { ProfileStore } from "@/lib/sectors";
 import {
 	type Activity,
 	PARSER_VERSION,
@@ -24,6 +25,8 @@ const ORDER_KEY = "order";
 const SNAPSHOT_KEY = "snapshot";
 /** Shares the `prices` store with the snapshot — same lifetime, same wipe. */
 const HISTORY_KEY = "history";
+/** Shares the `prices` store with the other two, for the same reason. */
+const PROFILES_KEY = "profiles";
 
 interface StoredSource {
 	fileName: string;
@@ -344,6 +347,45 @@ export async function savePriceHistory(
 			tx.objectStore(PRICES).put({ key: HISTORY_KEY, history });
 		} else {
 			tx.objectStore(PRICES).delete(HISTORY_KEY);
+		}
+		await done(tx);
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * The stored security profiles — sector, industry, a fund's mix — or null if
+ * none have been fetched.
+ *
+ * Kept beside the snapshot and the history for the same reason history is:
+ * different lifetime, different cost to refetch. A profile barely moves — a
+ * company's sector essentially never changes — so this is the one of the
+ * three most worth having survive a reload.
+ */
+export async function loadSecurityProfiles(): Promise<ProfileStore | null> {
+	const db = await openDb();
+	try {
+		const tx = db.transaction(PRICES, "readonly");
+		const stored = await readValue<{ key: string; profiles: ProfileStore }>(
+			tx.objectStore(PRICES).get(PROFILES_KEY),
+		);
+		return stored?.profiles ?? null;
+	} finally {
+		db.close();
+	}
+}
+
+export async function saveSecurityProfiles(
+	profiles: ProfileStore | null,
+): Promise<void> {
+	const db = await openDb();
+	try {
+		const tx = db.transaction(PRICES, "readwrite");
+		if (profiles) {
+			tx.objectStore(PRICES).put({ key: PROFILES_KEY, profiles });
+		} else {
+			tx.objectStore(PRICES).delete(PROFILES_KEY);
 		}
 		await done(tx);
 	} finally {
